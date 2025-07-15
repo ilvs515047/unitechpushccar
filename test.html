@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>GAS 測試</title>
+</head>
+<body>
+  <button onclick="testFetch()">測試連線</button>
+  <pre id="log"></pre>
+  <script>
+    function testFetch() {
+      fetch("https://script.google.com/macros/s/你的部署網址/exec", {
+        method: "POST",
+        mode: "cors",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          mode: "lookup",
+          carId: "TEST123",
+          user: ""
+        })
+      })
+      .then(r => r.text())
+      .then(txt => {
+        console.log("✅ 成功：", txt);
+        document.getElementById("log").innerText = txt;
+      })
+      .catch(err => {
+        console.error("❌ 錯誤：", err);
+        document.getElementById("log").innerText = "錯誤：" + err;
+      });
+    }
+  </script>
+</body>
+</html>
