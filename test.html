@@ -2,67 +2,34 @@
 <html lang="zh-TW">
 <head>
   <meta charset="UTF-8">
-  <title>台車點檢系統</title>
+  <title>輸入寫入 Google Sheet</title>
 </head>
 <body>
-  <h2>台車點檢系統</h2>
-  <label>選擇模式：</label>
-  <select id="mode">
-    <option value="checkin">✅ 我要點檢</option>
-    <option value="lookup">🔍 查詢是否已點檢</option>
-  </select>
-  <br><br>
-
-  <label>點檢人員姓名：</label>
-  <input type="text" id="username" placeholder="請輸入姓名（查詢可空白）">
-  <br><br>
-
-  <label>車號 / QR 資料：</label>
-  <input type="text" id="carId" placeholder="例如：CAR001">
-  <br><br>
-
-  <button onclick="submitForm()">送出</button>
-  <p id="result" style="font-weight: bold;"></p>
+  <h3>請輸入文字：</h3>
+  <input type="text" id="inputText" placeholder="輸入內容">
+  <button onclick="submitText()">送出</button>
+  <p id="status"></p>
 
   <script>
-    function submitForm() {
-      const mode = document.getElementById("mode").value;
-      const user = document.getElementById("username").value;
-      const carId = document.getElementById("carId").value;
-      const resultEl = document.getElementById("result");
-
-      if (!carId) {
-        alert("❌ 請輸入車號！");
-        return;
-      }
-      if (mode === "checkin" && !user.trim()) {
-        alert("❌ 點檢時請輸入姓名！");
+    function submitText() {
+      const input = document.getElementById("inputText").value;
+      const status = document.getElementById("status");
+      if (!input.trim()) {
+        alert("請輸入文字！");
         return;
       }
 
-      resultEl.innerText = "📤 傳送中...";
-
-      const baseURL = "https://script.google.com/macros/s/AKfycbwBDq0kPI3UM--wFI1dZbeYVec7j355Q5VFVIhEj_bnPG8WHm_zI_toKkIqG-wmr7Sw/exec";
-      const url = new URL(baseURL);
-      url.searchParams.append("mode", mode);
-      url.searchParams.append("carId", carId);
-      url.searchParams.append("user", user);
+      const url = new URL("https://script.google.com/macros/s/AKfycbxvBoLEwHOmj4VLr5R7_jFPzrDB3XE0uau9n4phn8w1f3ukxXo24ljqbDF0plnmkXqM/exec"); // ← 替換成你的 URL
+      url.searchParams.append("text", input);
 
       fetch(url)
-        .then(response => {
-          if (!response.ok) throw new Error(`HTTP 錯誤 ${response.status}`);
-          return response.json();
-        })
-        .then(data => {
-          if (data.status === "success") {
-            resultEl.innerText = `✅ 結果：${data.message}`;
-          } else {
-            resultEl.innerText = `🚨 錯誤：${data.message}`;
-          }
+        .then(response => response.text())
+        .then(msg => {
+          status.innerText = msg;
         })
         .catch(err => {
-          console.error("❌ 發送失敗：", err);
-          resultEl.innerText = "🚨 發送失敗：" + err.message;
+          console.error(err);
+          status.innerText = "錯誤：" + err.message;
         });
     }
   </script>
