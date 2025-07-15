@@ -31,7 +31,6 @@
       const carId = document.getElementById("carId").value;
       const resultEl = document.getElementById("result");
 
-      // 將前端的驗證邏輯與後端保持一致，或只保留前端基本的非空驗證
       if (!carId) {
         alert("❌ 請輸入車號！");
         return;
@@ -43,39 +42,28 @@
 
       resultEl.innerText = "📤 傳送中...";
 
-      const formData = new URLSearchParams();
-      formData.append("mode", mode);
-      formData.append("carId", carId);
-      formData.append("user", user);
+      const baseURL = "https://script.google.com/macros/s/AKfycbwBDq0kPI3UM--wFI1dZbeYVec7j355Q5VFVIhEj_bnPG8WHm_zI_toKkIqG-wmr7Sw/exec";
+      const url = new URL(baseURL);
+      url.searchParams.append("mode", mode);
+      url.searchParams.append("carId", carId);
+      url.searchParams.append("user", user);
 
-      // 請確認這裡的 URL 是你最新部署的 GAS Web App URL
-      fetch("https://script.google.com/macros/s/AKfycbwBDq0kPI3UM--wFI1dZbeYVec7j355Q5VFVIhEj_bnPG8WHm_zI_toKkIqG-wmr7Sw/exec", { // **重要：替換為你實際部署的 Web App URL**
-        method: "POST",
-        mode: "cors",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded"
-        },
-        body: formData
-      })
-      .then(r => {
-        // 檢查響應是否成功，如果狀態碼不是 2xx，則拋出錯誤
-        if (!r.ok) {
-          throw new Error(`HTTP 錯誤！狀態碼：${r.status}`);
-        }
-        return r.json(); // 改為解析 JSON
-      })
-      .then(data => {
-        // 根據 JSON 響應的 status 屬性顯示結果
-        if (data.status === "success") {
-          resultEl.innerText = `✅ 結果：${data.message}`;
-        } else {
-          resultEl.innerText = `🚨 錯誤：${data.message}`;
-        }
-      })
-      .catch(err => {
-        console.error("❌ 發送失敗：", err);
-        resultEl.innerText = "🚨 發送失敗：" + err.message;
-      });
+      fetch(url)
+        .then(response => {
+          if (!response.ok) throw new Error(`HTTP 錯誤 ${response.status}`);
+          return response.json();
+        })
+        .then(data => {
+          if (data.status === "success") {
+            resultEl.innerText = `✅ 結果：${data.message}`;
+          } else {
+            resultEl.innerText = `🚨 錯誤：${data.message}`;
+          }
+        })
+        .catch(err => {
+          console.error("❌ 發送失敗：", err);
+          resultEl.innerText = "🚨 發送失敗：" + err.message;
+        });
     }
   </script>
 </body>
