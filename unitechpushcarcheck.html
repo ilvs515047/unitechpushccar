@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <title>台車點檢系統</title>
+  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+</head>
+<body>
+  <h2>台車點檢系統</h2>
+
+  <label>選擇模式：</label>
+  <select id="mode">
+    <option value="checkin">✅ 我要點檢</option>
+    <option value="lookup">🔍 查詢是否已點檢</option>
+  </select>
+
+  <br><br>
+  <label>點檢人員姓名：</label>
+  <input type="text" id="username" placeholder="請輸入姓名">
+
+  <div id="reader" style="width:300px; margin-top:20px;"></div>
+
+  <p id="result" style="font-weight:bold;"></p>
+
+  <script>
+    const reader = new Html5Qrcode("reader");
+    const resultEl = document.getElementById("result");
+
+    function sendToServer(qrData) {
+      const mode = document.getElementById("mode").value;
+      const user = document.getElementById("username").value;
+
+      if (mode === 'checkin' && !user) {
+        alert("請輸入姓名才能點檢！");
+        return;
+      }
+
+      fetch("https://script.google.com/macros/s/你的GAS網址/exec", {
+        method: "POST",
+        body: JSON.stringify({
+          mode: mode,
+          carId: qrData,
+          user: user
+        }),
+        headers: { "Content-Type": "application/json" }
+      })
+      .then(res => res.text())
+      .then(txt => {
+        resultEl.innerText = `📋 ${qrData} → ${txt}`;
+        reader.stop();
+      })
+      .catch(err => {
+        resultEl.innerText = "❌ 發送失敗：" + err;
+      });
+    }
+
+    reader.start(
+      { facingMode: "environment" },
+      { fps: 10, qrbox: 250 },
+      (decodedText, decodedResult) => {
+        reader.stop();
+        sendToServer(decodedText);
+      }
+    );
+  </script>
+</body>
+</html>
