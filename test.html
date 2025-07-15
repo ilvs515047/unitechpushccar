@@ -2,34 +2,85 @@
 <html lang="zh-TW">
 <head>
   <meta charset="UTF-8">
-  <title>輸入寫入 Google Sheet</title>
+  <title>台車點檢系統</title>
+  <script src="https://unpkg.com/html5-qrcode"></script>
 </head>
 <body>
-  <h3>請輸入文字：</h3>
-  <input type="text" id="inputText" placeholder="輸入內容">
-  <button onclick="submitText()">送出</button>
-  <p id="status"></p>
+  <h2>台車點檢系統</h2>
+  <div id="reader" style="width:300px;"></div>
+  <p id="carIdDisplay" style="font-weight:bold; margin-top:10px;"></p>
+
+  <button onclick="lookupRecord()">🔍 查詢</button>
+  <button onclick="checkinRecord()">✅ 點檢</button>
+  <p id="result" style="margin-top: 10px; font-weight:bold;"></p>
 
   <script>
-    function submitText() {
-      const input = document.getElementById("inputText").value;
-      const status = document.getElementById("status");
-      if (!input.trim()) {
-        alert("請輸入文字！");
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbxvBoLEwHOmj4VLr5R7_jFPzrDB3XE0uau9n4phn8w1f3ukxXo24ljqbDF0plnmkXqM/exec";
+    let scannedCarId = "";
+
+    // 啟用 QR Code 掃描器
+    const qrScanner = new Html5Qrcode("reader");
+    qrScanner.start(
+      { facingMode: "environment" },  // 後鏡頭
+      { fps: 10, qrbox: 250 },
+      qrCodeMessage => {
+        scannedCarId = qrCodeMessage;
+        document.getElementById("carIdDisplay").innerText = `📷 此為編號：「${scannedCarId}」的台車`;
+        qrScanner.stop(); // 掃完停掉
+      },
+      errorMessage => {
+        // 可以忽略掃描錯誤
+      }
+    ).catch(err => {
+      document.getElementById("carIdDisplay").innerText = "❌ 無法啟用攝影機：" + err;
+    });
+
+    // 查詢最近點檢紀錄
+    function lookupRecord() {
+      if (!scannedCarId) {
+        alert("請先掃描台車 QR Code！");
         return;
       }
 
-      const url = new URL("https://script.google.com/macros/s/AKfycbxvBoLEwHOmj4VLr5R7_jFPzrDB3XE0uau9n4phn8w1f3ukxXo24ljqbDF0plnmkXqM/exec"); // ← 替換成你的 URL
-      url.searchParams.append("text", input);
+      const url = new URL(GAS_URL);
+      url.searchParams.append("mode", "lookup");
+      url.searchParams.append("carId", scannedCarId);
 
       fetch(url)
-        .then(response => response.text())
-        .then(msg => {
-          status.innerText = msg;
+        .then(res => res.text())
+        .then(txt => {
+          document.getElementById("result").innerText = txt;
         })
         .catch(err => {
-          console.error(err);
-          status.innerText = "錯誤：" + err.message;
+          document.getElementById("result").innerText = "❌ 查詢失敗：" + err.message;
+        });
+    }
+
+    // 點檢並填寫異音狀況
+    function checkinRecord() {
+      if (!scannedCarId) {
+        alert("請先掃描台車 QR Code！");
+        return;
+      }
+
+      const noise = prompt("請輸入是否有異音？（例如：無、有異音）");
+      if (noise === null || noise.trim() === "") {
+        alert("未填寫異音情況，已取消點檢");
+        return;
+      }
+
+      const url = new URL(GAS_URL);
+      url.searchParams.append("mode", "checkin");
+      url.searchParams.append("carId", scannedCarId);
+      url.searchParams.append("noise", noise.trim());
+
+      fetch(url)
+        .then(res => res.text())
+        .then(txt => {
+          document.getElementById("result").innerText = txt;
+        })
+        .catch(err => {
+          document.getElementById("result").innerText = "❌ 點檢失敗：" + err.message;
         });
     }
   </script>
