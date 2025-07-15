@@ -8,7 +8,7 @@
   <h2>台車點檢系統</h2>
   <label>選擇模式：</label>
   <select id="mode">
-    <option value="checkin">✅ 我要點檢123</option>
+    <option value="checkin">✅ 我要點檢</option>
     <option value="lookup">🔍 查詢是否已點檢</option>
   </select>
   <br><br>
@@ -31,6 +31,7 @@
       const carId = document.getElementById("carId").value;
       const resultEl = document.getElementById("result");
 
+      // 將前端的驗證邏輯與後端保持一致，或只保留前端基本的非空驗證
       if (!carId) {
         alert("❌ 請輸入車號！");
         return;
@@ -47,7 +48,8 @@
       formData.append("carId", carId);
       formData.append("user", user);
 
-      fetch("https://script.google.com/macros/s/AKfycbwBDq0kPI3UM--wFI1dZbeYVec7j355Q5VFVIhEj_bnPG8WHm_zI_toKkIqG-wmr7Sw/exec", {
+      // 請確認這裡的 URL 是你最新部署的 GAS Web App URL
+      fetch("YOUR_NEW_GAS_WEB_APP_URL_HERE", { // **重要：替換為你實際部署的 Web App URL**
         method: "POST",
         mode: "cors",
         headers: {
@@ -55,9 +57,20 @@
         },
         body: formData
       })
-      .then(r => r.text())
-      .then(txt => {
-        resultEl.innerText = `✅ 結果：${txt}`;
+      .then(r => {
+        // 檢查響應是否成功，如果狀態碼不是 2xx，則拋出錯誤
+        if (!r.ok) {
+          throw new Error(`HTTP 錯誤！狀態碼：${r.status}`);
+        }
+        return r.json(); // 改為解析 JSON
+      })
+      .then(data => {
+        // 根據 JSON 響應的 status 屬性顯示結果
+        if (data.status === "success") {
+          resultEl.innerText = `✅ 結果：${data.message}`;
+        } else {
+          resultEl.innerText = `🚨 錯誤：${data.message}`;
+        }
       })
       .catch(err => {
         console.error("❌ 發送失敗：", err);
