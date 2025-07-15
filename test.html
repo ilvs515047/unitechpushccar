@@ -1,34 +1,67 @@
 <!DOCTYPE html>
-<html>
+<html lang="zh-TW">
 <head>
-  <meta charset="utf-8">
-  <title>GAS 測試</title>
+  <meta charset="UTF-8">
+  <title>台車點檢系統</title>
 </head>
 <body>
-  <button onclick="testFetch()">測試連線</button>
-  <pre id="log"></pre>
+  <h2>台車點檢系統</h2>
+  <label>選擇模式：</label>
+  <select id="mode">
+    <option value="checkin">✅ 我要點檢</option>
+    <option value="lookup">🔍 查詢是否已點檢</option>
+  </select>
+  <br><br>
+
+  <label>點檢人員姓名：</label>
+  <input type="text" id="username" placeholder="請輸入姓名（查詢可空白）">
+  <br><br>
+
+  <label>車號 / QR 資料：</label>
+  <input type="text" id="carId" placeholder="例如：CAR001">
+  <br><br>
+
+  <button onclick="submitForm()">送出</button>
+  <p id="result" style="font-weight: bold;"></p>
+
   <script>
-    function testFetch() {
+    function submitForm() {
+      const mode = document.getElementById("mode").value;
+      const user = document.getElementById("username").value;
+      const carId = document.getElementById("carId").value;
+      const resultEl = document.getElementById("result");
+
+      if (!carId) {
+        alert("❌ 請輸入車號！");
+        return;
+      }
+      if (mode === "checkin" && !user.trim()) {
+        alert("❌ 點檢時請輸入姓名！");
+        return;
+      }
+
+      resultEl.innerText = "📤 傳送中...";
+
+      const formData = new URLSearchParams();
+      formData.append("mode", mode);
+      formData.append("carId", carId);
+      formData.append("user", user);
+
       fetch("https://script.google.com/macros/s/AKfycbzj0bNUa8jwBAd8anGSObX4NVoBBDbHmEbnIFfDAQKUV13OywpPiVvwnllf9ACLQpQk/exec", {
         method: "POST",
         mode: "cors",
         headers: {
-          "Content-Type": "application/json"
+          "Content-Type": "application/x-www-form-urlencoded"
         },
-        body: JSON.stringify({
-          mode: "lookup",
-          carId: "TEST123",
-          user: ""
-        })
+        body: formData
       })
       .then(r => r.text())
       .then(txt => {
-        console.log("✅ 成功：", txt);
-        document.getElementById("log").innerText = txt;
+        resultEl.innerText = `✅ 結果：${txt}`;
       })
       .catch(err => {
-        console.error("❌ 錯誤：", err);
-        document.getElementById("log").innerText = "錯誤：" + err;
+        console.error("❌ 發送失敗：", err);
+        resultEl.innerText = "🚨 發送失敗：" + err.message;
       });
     }
   </script>
