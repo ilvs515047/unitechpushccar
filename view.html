@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <title>台車點檢紀錄查詢</title>
+  <script src="https://unpkg.com/html5-qrcode"></script>
+  <style>
+    body { font-family: sans-serif; padding: 20px; background: #f4f4f4; }
+    #reader { width: 300px; margin-bottom: 20px; }
+    table { border-collapse: collapse; width: 100%; background: white; }
+    th, td { border: 1px solid #999; padding: 8px; text-align: center; }
+    th { background-color: #eee; }
+    #carIdDisplay, #resultArea p { font-weight: bold; }
+  </style>
+</head>
+<body>
+  <h2>📋 台車點檢紀錄查詢</h2>
+  <div id="reader"></div>
+  <p id="carIdDisplay">📷 等待掃描 QR Code...</p>
+  <div id="resultArea"></div>
+
+  <script>
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbzq1aWVOAwWHp50RQEIz7vrm6nDBzX-Yrf-QX9PYddSL8JtTAun-NfwcoB2cocmqb0osQ/exec";
+
+    const qrScanner = new Html5Qrcode("reader");
+    qrScanner.start(
+      { facingMode: "environment" },
+      { fps: 10, qrbox: 250 },
+      qrCodeMessage => {
+        const carId = qrCodeMessage.trim();
+        document.getElementById("carIdDisplay").innerText = `🚚 掃描台車編號：${carId}`;
+        qrScanner.stop();
+
+        const url = `${GAS_URL}?mode=view&carId=${encodeURIComponent(carId)}`;
+        fetch(url)
+          .then(res => {
+            if (res.headers.get("content-type")?.includes("application/json")) {
+              return res.json();
+            } else {
+              return res.text().then(t => { throw new Error(t); });
+            }
+          })
+          .then(data => {
+            if (!data.headers || !data.values) {
+              document.getElementById("resultArea").innerHTML = `<p style="color:red;">⚠️ 無法解析資料</p>`;
+              return;
+            }
+
+            let html = `<p>📅 最後一次點檢日期：${data.date}</p><table><tr>`;
+            data.headers.forEach(h => { html += `<th>${h}</th>`; });
+            html += `</tr><tr>`;
+            data.values.forEach(v => { html += `<td>${v || "-"}</td>`; });
+            html += `</tr></table>`;
+            document.getElementById("resultArea").innerHTML = html;
+          })
+          .catch(err => {
+            document.getElementById("resultArea").innerHTML = `<p style="color:red;">❌ 查詢失敗：${err.message}</p>`;
+          });
+      },
+      errorMessage => {}
+    ).catch(err => {
+      document.getElementById("carIdDisplay").innerText = "❌ 無法啟用攝影機：" + err;
+    });
+  </script>
+</body>
+</html>
