@@ -93,12 +93,18 @@
 
 <script>
   const GAS_URL = "https://script.google.com/macros/s/AKfycbx4SpWKpKqPhADrIn1KSVZRIK2Fv7mcw-lMKOprCmASQhtJONilxXuM5wI1MSsnKRhlFA/exec";
-  let qrScanner;
+  let scannerInstance = null;
 
+  // 初始化並開始 QR 掃描器
   function startScanner() {
-    qrScanner = new Html5Qrcode("reader");
+    // 清空讀取器畫面與先前殘留的 video
+    const readerContainer = document.getElementById("reader");
+    readerContainer.innerHTML = "";
 
-    qrScanner.start(
+    // 建立新實例
+    scannerInstance = new Html5Qrcode("reader");
+
+    scannerInstance.start(
       { facingMode: "environment" },
       {
         fps: 5,
@@ -108,23 +114,48 @@
       qrCodeMessage => {
         const carId = qrCodeMessage.trim();
         document.getElementById("carIdDisplay").innerText = `🚚 台車編號：${carId}`;
-        qrScanner.stop().then(() => {
+
+        // 停止掃描器並查詢資料
+        stopScanner().then(() => {
           fetchData(carId);
         });
       },
-      errorMessage => { /* 忽略掃描錯誤訊息 */ }
+      errorMessage => {
+        // 可忽略持續性錯誤，例如偵測不到
+      }
     ).catch(err => {
       document.getElementById("carIdDisplay").innerText = "❌ 無法啟用攝影機：" + err;
     });
   }
 
+  // 安全停止並清除掃描器（若存在）
+  function stopScanner() {
+    if (scannerInstance) {
+      return scannerInstance.stop().then(() => {
+        return scannerInstance.clear().then(() => {
+          scannerInstance = null;
+          document.getElementById("reader").innerHTML = "";
+        });
+      }).catch(err => {
+        console.warn("⚠️ 停止掃描器時發生錯誤：", err);
+        scannerInstance = null;
+        document.getElementById("reader").innerHTML = "";
+      });
+    } else {
+      return Promise.resolve(); // 沒有掃描器就直接 resolve
+    }
+  }
+
+  // 查詢資料顯示
   function fetchData(carId) {
     const overlay = document.getElementById("loadingOverlay");
     overlay.style.display = "flex";
 
     const url = `${GAS_URL}?mode=view&carId=${encodeURIComponent(carId)}`;
     fetch(url)
-      .then(res => res.headers.get("content-type")?.includes("application/json") ? res.json() : res.text().then(t => { throw new Error(t); }))
+      .then(res => res.headers.get("content-type")?.includes("application/json")
+        ? res.json()
+        : res.text().then(t => { throw new Error(t); }))
       .then(data => {
         const resultArea = document.getElementById("resultArea");
         resultArea.innerHTML = `
@@ -139,6 +170,7 @@
             </div>
           `;
         }
+
         document.getElementById("rescanBtn").style.display = "inline-block";
       })
       .catch(err => {
@@ -149,14 +181,18 @@
       });
   }
 
+  // 點擊「重新掃描」
   document.getElementById("rescanBtn").addEventListener("click", () => {
     document.getElementById("resultArea").innerHTML = "";
     document.getElementById("carIdDisplay").innerText = "📷 等待重新掃描 QR Code...";
     document.getElementById("rescanBtn").style.display = "none";
-    qrScanner.clear().then(() => startScanner());
+
+    stopScanner().then(() => {
+      startScanner();
+    });
   });
 
-  // 初始化啟動
+  // 初始啟動
   startScanner();
 </script>
 
