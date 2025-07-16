@@ -2,87 +2,95 @@
 <html lang="zh-TW">
 <head>
   <meta charset="UTF-8">
-  <title>台車點檢系統</title>
+  <title>台車點檢表單</title>
   <script src="https://unpkg.com/html5-qrcode"></script>
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    .section { margin-bottom: 20px; }
+    label { display: block; margin-top: 10px; }
+    input[type="text"] { width: 100%; padding: 4px; margin-top: 4px; }
+  </style>
 </head>
 <body>
-  <h2>台車點檢系統</h2>
+  <h2>台車點檢系統（點檢端）</h2>
   <div id="reader" style="width:300px;"></div>
-  <p id="carIdDisplay" style="font-weight:bold; margin-top:10px;"></p>
+  <p id="carIdDisplay" style="font-weight:bold;"></p>
 
-  <button onclick="lookupRecord()">🔍 查詢</button>
-  <button onclick="checkinRecord()">✅ 點檢</button>
-  <p id="result" style="margin-top: 10px; font-weight:bold;"></p>
+  <form id="checkForm" style="display:none;">
+    <div class="section"><strong>🔧 前輪（轉向輪）</strong>
+      <label>1. 車架&鐵片平台焊接多少% <input type="text" name="f1"></label>
+      <label><input type="checkbox" name="f1_ok"> 無異常</label>
+
+      <label>2. 鐵片平台&車輪是否異常 <input type="text" name="f2"></label>
+      <label><input type="checkbox" name="f2_ok"> 無異常</label>
+
+      <label>3. 車輪/煞車描述 <input type="text" name="f3"></label>
+      <label><input type="checkbox" name="f3_ok"> 無異常</label>
+    </div>
+
+    <div class="section"><strong>🔧 後輪（手把端）</strong>
+      <label>1. 車架&鐵片平台焊接多少% <input type="text" name="b1"></label>
+      <label><input type="checkbox" name="b1_ok"> 無異常</label>
+
+      <label>2. 鐵片平台&車輪是否異常 <input type="text" name="b2"></label>
+      <label><input type="checkbox" name="b2_ok"> 無異常</label>
+
+      <label>3. 車輪/煞車描述 <input type="text" name="b3"></label>
+      <label><input type="checkbox" name="b3_ok"> 無異常</label>
+    </div>
+
+    <div class="section"><strong>🔧 車架/骨架接縫處</strong>
+      <label>描述狀況 <input type="text" name="frame"></label>
+      <label><input type="checkbox" name="frame_ok"> 無異常</label>
+    </div>
+
+    <button type="submit">✅ 提交點檢</button>
+  </form>
+
+  <p id="result" style="font-weight:bold; margin-top:20px;"></p>
 
   <script>
-    const GAS_URL = "https://script.google.com/macros/s/AKfycbwfpGrT8eMmmN5RS-_NAskcuirU7cuqE7v2DulGMyS_lF1U05Pg7-QxtYIxPrH9ScC2/exec";
+    const GAS_URL = "https://script.google.com/macros/s/YOUR_GAS_URL_HERE/exec";
     let scannedCarId = "";
 
-    // 啟用 QR Code 掃描器
     const qrScanner = new Html5Qrcode("reader");
     qrScanner.start(
-      { facingMode: "environment" },  // 後鏡頭
+      { facingMode: "environment" },
       { fps: 10, qrbox: 250 },
       qrCodeMessage => {
         scannedCarId = qrCodeMessage;
         document.getElementById("carIdDisplay").innerText = `📷 此為編號：「${scannedCarId}」的台車`;
-        qrScanner.stop(); // 掃完停掉
+        qrScanner.stop();
+        document.getElementById("checkForm").style.display = "block";
       },
-      errorMessage => {
-        // 可以忽略掃描錯誤
-      }
+      errorMessage => {}
     ).catch(err => {
       document.getElementById("carIdDisplay").innerText = "❌ 無法啟用攝影機：" + err;
     });
 
-    // 查詢最近點檢紀錄
-    function lookupRecord() {
-      if (!scannedCarId) {
-        alert("請先掃描台車 QR Code！");
-        return;
+    document.getElementById("checkForm").addEventListener("submit", function(e) {
+      e.preventDefault();
+
+      const formData = new FormData(this);
+      const data = {
+        mode: "checkin_detail",
+        carId: scannedCarId
+      };
+
+      for (const [key, val] of formData.entries()) {
+        data[key] = val || "";
       }
 
-      const url = new URL(GAS_URL);
-      url.searchParams.append("mode", "lookup");
-      url.searchParams.append("carId", scannedCarId);
-
-      fetch(url)
+      fetch(GAS_URL + "?" + new URLSearchParams(data))
         .then(res => res.text())
         .then(txt => {
           document.getElementById("result").innerText = txt;
-        })
-        .catch(err => {
-          document.getElementById("result").innerText = "❌ 查詢失敗：" + err.message;
-        });
-    }
-
-    // 點檢並填寫異音狀況
-    function checkinRecord() {
-      if (!scannedCarId) {
-        alert("請先掃描台車 QR Code！");
-        return;
-      }
-
-      const noise = prompt("請輸入是否有異音？（例如：無、有異音）");
-      if (noise === null || noise.trim() === "") {
-        alert("未填寫異音情況，已取消點檢");
-        return;
-      }
-
-      const url = new URL(GAS_URL);
-      url.searchParams.append("mode", "checkin");
-      url.searchParams.append("carId", scannedCarId);
-      url.searchParams.append("noise", noise.trim());
-
-      fetch(url)
-        .then(res => res.text())
-        .then(txt => {
-          document.getElementById("result").innerText = txt;
+          this.reset();
         })
         .catch(err => {
           document.getElementById("result").innerText = "❌ 點檢失敗：" + err.message;
         });
-    }
+    });
   </script>
 </body>
 </html>
