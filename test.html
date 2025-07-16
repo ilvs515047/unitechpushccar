@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
   <meta charset="UTF-8">
-  <title>UT台車點檢表單</title>
+  <title>UT 台車點檢表單</title>
   <script src="https://unpkg.com/html5-qrcode"></script>
   <style>
     body { font-family: sans-serif; padding: 20px; }
@@ -70,43 +70,54 @@
   });
 
   document.getElementById("checkForm").addEventListener("submit", function(e) {
-    e.preventDefault();
+  e.preventDefault();
 
-    // 🔍 驗證是否至少有一個欄位有填或打勾
-    const formData = new FormData(this);
-    let hasInput = false;
+  const requiredFields = [
+    "f1", "f1_ok", "f2", "f2_ok", "f3", "f3_ok",
+    "b1", "b1_ok", "b2", "b2_ok", "b3", "b3_ok",
+    "frame", "frame_ok"
+  ];
 
-    for (const [key, val] of formData.entries()) {
-      if (val.trim() !== "") {
-        hasInput = true;
-        break;
-      }
+  const formData = new FormData(this);
+  let allValid = true;
+
+  // 每一組（文字 + 勾選）都要至少填其中一個
+  for (let i = 0; i < requiredFields.length; i += 2) {
+    const textVal = formData.get(requiredFields[i])?.trim();
+    const checkboxVal = formData.get(requiredFields[i + 1]);
+    if (!textVal && !checkboxVal) {
+      allValid = false;
+      break;
     }
+  }
 
-    if (!hasInput) {
-      alert("⚠️ 請至少填寫一項或勾選一項，才能提交！");
-      return;
-    }
+  if (!allValid) {
+    alert("⚠️ 所有檢查項目都必須填寫文字或勾選無異常！");
+    return;
+  }
 
-    const data = {
-      mode: "checkin_detail",
-      carId: scannedCarId
-    };
+  // 準備送出資料
+  const data = {
+    mode: "checkin_detail",
+    carId: scannedCarId
+  };
 
-    for (const [key, val] of formData.entries()) {
-      data[key] = val || "";
-    }
+  for (const [key, val] of formData.entries()) {
+    data[key] = val || "";
+  }
 
-    fetch(GAS_URL + "?" + new URLSearchParams(data))
-      .then(res => res.text())
-      .then(txt => {
-        document.getElementById("result").innerText = txt;
-        this.reset();
-      })
-      .catch(err => {
-        document.getElementById("result").innerText = "❌ 點檢失敗：" + err.message;
-      });
-  });
+  fetch(GAS_URL + "?" + new URLSearchParams(data))
+    .then(res => res.text())
+    .then(txt => {
+      document.getElementById("result").innerText = txt;
+      this.reset();
+      alert("✅ 點檢成功！");
+    })
+    .catch(err => {
+      document.getElementById("result").innerText = "❌ 點檢失敗：" + err.message;
+    });
+});
+
 </script>
 </body>
 </html>
