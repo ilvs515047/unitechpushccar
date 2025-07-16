@@ -1,12 +1,3 @@
-好的，沒有問題。
-
-問題出在您的 CSS 樣式中，您為 `#loadingOverlay` 同時設定了 `display: none;` (隱藏) 和 `display: flex;` (顯示)，導致後者覆蓋了前者，讓「查詢中...」的載入畫面在一開始就顯示出來。
-
-我已經幫您修正了這個問題，移除了多餘的 `display: flex;` 樣式。現在，載入畫面將會預設為隱藏，並只在掃描 QR Code 後、等待資料回傳的期間才會出現。
-
-請直接複製下方的完整程式碼使用即可。
-
-```html
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
