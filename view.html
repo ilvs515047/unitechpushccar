@@ -97,7 +97,14 @@
   let pauseResumeTimer = null;
 
   function startScanner() {
-    document.getElementById("reader").innerHTML = "";
+    if (scanner) {
+      scanner.clear().then(() => initScanner());
+    } else {
+      initScanner();
+    }
+  }
+
+  function initScanner() {
     scanner = new Html5Qrcode("reader");
 
     scanner.start(
@@ -118,7 +125,7 @@
             console.warn("⚠️ resume 失敗，重啟 scanner", err);
             scanner.stop().then(() => scanner.clear()).then(() => startScanner());
           });
-        }, 100); // 閃爍小於 0.1 秒，使用者幾乎無感
+        }, 100); // 閃爍小於 0.1 秒
       }, 2000);
     }).catch(err => {
       document.getElementById("carIdDisplay").innerText = "❌ 攝影機啟用錯誤：" + err;
@@ -164,11 +171,13 @@
     document.getElementById("carIdDisplay").innerText = "📷 等待重新掃描 QR Code...";
     document.getElementById("rescanBtn").style.display = "none";
     clearInterval(pauseResumeTimer);
-    scanner.clear().then(() => startScanner());
+    startScanner(); // 不重建 DOM，只重新掃描
   });
 
+  // ✅ 第一次啟動掃描器
   startScanner();
 </script>
+
 
 </body>
 </html>
