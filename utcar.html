@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>UT 台車點檢首頁</title>
+  <style>
+    body {
+      font-family: "Segoe UI", "Microsoft JhengHei", sans-serif;
+      background-color: #f2f8ff;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+    }
+    h1 {
+      color: #333;
+      text-align: center;
+      margin-bottom: 40px;
+      font-size: 28px;
+    }
+    .button-container {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      width: 80%;
+      max-width: 300px;
+    }
+    .cute-button {
+      background-color: #ffcc70;
+      color: #333;
+      border: none;
+      border-radius: 16px;
+      padding: 20px;
+      font-size: 20px;
+      font-weight: bold;
+      cursor: pointer;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+      transition: all 0.2s ease-in-out;
+    }
+    .cute-button:hover {
+      background-color: #ffc04c;
+      transform: scale(1.05);
+    }
+    .emoji {
+      font-size: 24px;
+      margin-right: 8px;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>🚚 UT 台車點檢系統</h1>
+  <div class="button-container">
+    <button class="cute-button" onclick="location.href='https://ilvs515047.github.io/unitechpushccar/test.html'">
+      ✅ 我要點台車
+    </button>
+    <button class="cute-button" onclick="location.href='https://ilvs515047.github.io/unitechpushccar/view.html'">
+      🔍 我要查台車
+    </button>
+  </div>
+
+</body>
+</html>
