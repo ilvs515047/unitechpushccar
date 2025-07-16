@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
   <meta charset="UTF-8">
-  <title>台車點檢表單</title>
+  <title>UT台車點檢表單</title>
   <script src="https://unpkg.com/html5-qrcode"></script>
   <style>
     body { font-family: sans-serif; padding: 20px; }
@@ -12,7 +12,7 @@
   </style>
 </head>
 <body>
-  <h2>台車點檢系統（點檢端）</h2>
+  <h2>UT台車點檢系統（點檢端）</h2>
   <div id="reader" style="width:300px;"></div>
   <p id="carIdDisplay" style="font-weight:bold;"></p>
 
@@ -53,44 +53,60 @@
     const GAS_URL = "https://script.google.com/macros/s/AKfycbyXV5ac5j1WVTLKhFdBzMOICnNQAkfwdpKUENj9L1LcAfgxi8xT3c6QLIdRHed7LARv/exec";
     let scannedCarId = "";
 
-    const qrScanner = new Html5Qrcode("reader");
-    qrScanner.start(
-      { facingMode: "environment" },
-      { fps: 10, qrbox: 250 },
-      qrCodeMessage => {
-        scannedCarId = qrCodeMessage;
-        document.getElementById("carIdDisplay").innerText = `📷 此為編號：「${scannedCarId}」的台車`;
-        qrScanner.stop();
-        document.getElementById("checkForm").style.display = "block";
-      },
-      errorMessage => {}
-    ).catch(err => {
-      document.getElementById("carIdDisplay").innerText = "❌ 無法啟用攝影機：" + err;
-    });
 
-    document.getElementById("checkForm").addEventListener("submit", function(e) {
-      e.preventDefault();
+  const qrScanner = new Html5Qrcode("reader");
+  qrScanner.start(
+    { facingMode: "environment" },
+    { fps: 10, qrbox: 250 },
+    qrCodeMessage => {
+      scannedCarId = qrCodeMessage;
+      document.getElementById("carIdDisplay").innerText = `📷 此為編號：「${scannedCarId}」的台車`;
+      qrScanner.stop();
+      document.getElementById("checkForm").style.display = "block";
+    },
+    errorMessage => {}
+  ).catch(err => {
+    document.getElementById("carIdDisplay").innerText = "❌ 無法啟用攝影機：" + err;
+  });
 
-      const formData = new FormData(this);
-      const data = {
-        mode: "checkin_detail",
-        carId: scannedCarId
-      };
+  document.getElementById("checkForm").addEventListener("submit", function(e) {
+    e.preventDefault();
 
-      for (const [key, val] of formData.entries()) {
-        data[key] = val || "";
+    // 🔍 驗證是否至少有一個欄位有填或打勾
+    const formData = new FormData(this);
+    let hasInput = false;
+
+    for (const [key, val] of formData.entries()) {
+      if (val.trim() !== "") {
+        hasInput = true;
+        break;
       }
+    }
 
-      fetch(GAS_URL + "?" + new URLSearchParams(data))
-        .then(res => res.text())
-        .then(txt => {
-          document.getElementById("result").innerText = txt;
-          this.reset();
-        })
-        .catch(err => {
-          document.getElementById("result").innerText = "❌ 點檢失敗：" + err.message;
-        });
-    });
-  </script>
+    if (!hasInput) {
+      alert("⚠️ 請至少填寫一項或勾選一項，才能提交！");
+      return;
+    }
+
+    const data = {
+      mode: "checkin_detail",
+      carId: scannedCarId
+    };
+
+    for (const [key, val] of formData.entries()) {
+      data[key] = val || "";
+    }
+
+    fetch(GAS_URL + "?" + new URLSearchParams(data))
+      .then(res => res.text())
+      .then(txt => {
+        document.getElementById("result").innerText = txt;
+        this.reset();
+      })
+      .catch(err => {
+        document.getElementById("result").innerText = "❌ 點檢失敗：" + err.message;
+      });
+  });
+</script>
 </body>
 </html>
