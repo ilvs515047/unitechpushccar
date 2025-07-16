@@ -147,7 +147,7 @@
         const resultArea = document.getElementById("resultArea");
         resultArea.innerHTML = `
           <div class="info">📅 點檢日期：${data.date}</div>
-          <div class="info">👷‍♂️ 點檢人員工號：${data.values[0] || "-"}</div>
+          <div class="info">👷‍♂️ 點檢人員..工號：${data.values[0] || "-"}</div>
         `;
         for (let i = 1; i < data.headers.length; i++) {
           resultArea.innerHTML += `
