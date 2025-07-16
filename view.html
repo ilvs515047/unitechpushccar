@@ -93,21 +93,17 @@
 
 <script>
   const GAS_URL = "https://script.google.com/macros/s/AKfycbwwA7ZiTNgYCfpN4O5VTLTgGDoN5ZsFupcLjQKsoOMAvJu3lwkQnLDkvFypjNCKpfPh/exec";
-  let scanner = null;
   let scannedCarId = "";
 
   function startScanner() {
-    if (scanner) {
-      scanner.clear().then(() => initScanner()).catch(err => {
-        document.getElementById("carIdDisplay").innerText = "❌ 清除舊掃描器失敗：" + err;
-      });
-    } else {
-      initScanner();
-    }
-  }
+    // ✅ 每次都重建 reader DOM，避免 html5-qrcode 殘留錯誤狀態
+    const readerWrapper = document.getElementById("reader");
+    readerWrapper.innerHTML = "";  // 清空舊容器
+    const newDiv = document.createElement("div");
+    newDiv.id = "reader-inner";
+    readerWrapper.appendChild(newDiv);
 
-  function initScanner() {
-    scanner = new Html5Qrcode("reader");
+    const scanner = new Html5Qrcode("reader-inner");
     scanner.start(
       { facingMode: "environment" },
       {
@@ -130,10 +126,10 @@
         });
       },
       errorMessage => {
-        // 可加入 console.warn(errorMessage);
+        // 可選錯誤提示：console.warn(errorMessage);
       }
     ).catch(err => {
-      document.getElementById("carIdDisplay").innerText = "❌ 無法啟用攝影機：" + err;
+      document.getElementById("carIdDisplay").innerText = "❌ 攝影機啟用錯誤：" + err;
     });
   }
 
@@ -177,9 +173,10 @@
     startScanner();
   });
 
-  // ✅ 初始化
+  // ✅ 初始啟動
   startScanner();
 </script>
+
 
 </body>
 </html>
