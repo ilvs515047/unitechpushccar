@@ -84,7 +84,7 @@
 </head>
 <body>
 
-<h2>📋 UT台車點檢紀錄查詢..</h2>
+<h2>📋 UT台車點檢紀錄查詢.</h2>
 <div id="reader"></div>
 <p id="carIdDisplay" class="status">📷 等待掃描 QR Code...</p>
 <div id="resultArea"></div>
@@ -94,7 +94,6 @@
 <script>
   const GAS_URL = "https://script.google.com/macros/s/AKfycbx4SpWKpKqPhADrIn1KSVZRIK2Fv7mcw-lMKOprCmASQhtJONilxXuM5wI1MSsnKRhlFA/exec";
   let scanner = null;
-  let pauseResumeTimer = null;
 
   function startScanner() {
     if (scanner) {
@@ -109,25 +108,19 @@
 
     scanner.start(
       { facingMode: "environment" },
-      { fps: 5, qrbox: 250 },
+      { fps: 10, qrbox: 250 },
       qrCodeMessage => {
         const carId = qrCodeMessage.trim();
         document.getElementById("carIdDisplay").innerText = `🚚 台車編號：${carId}`;
-        clearInterval(pauseResumeTimer);
-        scanner.stop().then(() => scanner.clear()).then(() => fetchData(carId));
+        scanner.stop().then(() => {
+          scanner.clear();
+          fetchData(carId);
+        });
       },
-      errorMessage => {}
-    ).then(() => {
-      pauseResumeTimer = setInterval(() => {
-        scanner.pause();
-        setTimeout(() => {
-          scanner.resume().catch(err => {
-            console.warn("⚠️ resume 失敗，重啟 scanner", err);
-            scanner.stop().then(() => scanner.clear()).then(() => startScanner());
-          });
-        }, 100); // 閃爍小於 0.1 秒
-      }, 2000);
-    }).catch(err => {
+      errorMessage => {
+        // 可忽略掃描失敗的瞬間錯誤（例如偵測不到）
+      }
+    ).catch(err => {
       document.getElementById("carIdDisplay").innerText = "❌ 攝影機啟用錯誤：" + err;
     });
   }
@@ -155,7 +148,6 @@
             </div>
           `;
         }
-
         document.getElementById("rescanBtn").style.display = "inline-block";
       })
       .catch(err => {
@@ -170,13 +162,13 @@
     document.getElementById("resultArea").innerHTML = "";
     document.getElementById("carIdDisplay").innerText = "📷 等待重新掃描 QR Code...";
     document.getElementById("rescanBtn").style.display = "none";
-    clearInterval(pauseResumeTimer);
-    startScanner(); // 不重建 DOM，只重新掃描
+    startScanner();
   });
 
-  // ✅ 第一次啟動掃描器
+  // ✅ 初始化啟動
   startScanner();
 </script>
+
 
 
 </body>
