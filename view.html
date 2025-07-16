@@ -98,9 +98,8 @@
 
   function startScanner() {
     if (scanner) {
-      scanner.clear().then(() => {
-        scanner = null;
-        initScanner();
+      scanner.clear().then(() => initScanner()).catch(err => {
+        document.getElementById("carIdDisplay").innerText = "❌ 清除舊掃描器失敗：" + err;
       });
     } else {
       initScanner();
@@ -124,17 +123,17 @@
         scannedCarId = qrCodeMessage.trim();
         document.getElementById("carIdDisplay").innerText = `🚚 台車編號：${scannedCarId}`;
         scanner.stop().then(() => {
-          scanner.clear().then(() => {
-            scanner = null;
-            fetchData(scannedCarId);
-          });
+          scanner.clear();
+          fetchData(scannedCarId);
+        }).catch(err => {
+          document.getElementById("carIdDisplay").innerText = "❌ 停止掃描器失敗：" + err;
         });
       },
       errorMessage => {
         // 可加入 console.warn(errorMessage);
       }
     ).catch(err => {
-      document.getElementById("carIdDisplay").innerText = "❌ 攝影機啟用錯誤：" + err;
+      document.getElementById("carIdDisplay").innerText = "❌ 無法啟用攝影機：" + err;
     });
   }
 
@@ -178,7 +177,7 @@
     startScanner();
   });
 
-  // 初始化啟動掃描器
+  // ✅ 初始化
   startScanner();
 </script>
 
