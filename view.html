@@ -84,7 +84,7 @@
 </head>
 <body>
 
-<h2>📋 UT台車點檢紀錄查詢~</h2>
+<h2>📋 UT台車點檢紀錄查詢!</h2>
 <div id="reader"></div>
 <p id="carIdDisplay" class="status">📷 等待掃描 QR Code...</p>
 <div id="resultArea"></div>
@@ -93,43 +93,34 @@
 
 <script>
   const GAS_URL = "https://script.google.com/macros/s/AKfycbx4SpWKpKqPhADrIn1KSVZRIK2Fv7mcw-lMKOprCmASQhtJONilxXuM5wI1MSsnKRhlFA/exec";
-  let scanner = null;
+  let qrScanner;
+  let intervalId;
 
   function startScanner() {
-    const reader = document.getElementById("reader");
-    reader.innerHTML = ""; // 保險清除殘留 DOM
-
-    scanner = new Html5Qrcode("reader");
-    scanner.start(
+    qrScanner = new Html5Qrcode("reader");
+    qrScanner.start(
       { facingMode: "environment" },
       {
-        fps: 2,
-        qrbox: 250
-        // 移除 videoConstraints，避免硬壓解析度造成卡頓
+        fps: 5,
+        qrbox: 250,
+        videoConstraints: { width: { ideal: 640 }, height: { ideal: 480 } }
       },
       qrCodeMessage => {
         const carId = qrCodeMessage.trim();
         document.getElementById("carIdDisplay").innerText = `🚚 台車編號：${carId}`;
-        stopScanner().then(() => fetchData(carId));
+        qrScanner.stop();
+        clearInterval(intervalId);
+        fetchData(carId);
       },
       errorMessage => {}
     ).catch(err => {
       document.getElementById("carIdDisplay").innerText = "❌ 無法啟用攝影機：" + err;
     });
-  }
 
-  function stopScanner() {
-    if (!scanner) return Promise.resolve();
-    return scanner.stop().then(() => {
-      return scanner.clear().then(() => {
-        scanner = null;
-        document.getElementById("reader").innerHTML = "";
-      });
-    }).catch(err => {
-      console.warn("⚠️ 停止掃描器時錯誤：", err);
-      scanner = null;
-      document.getElementById("reader").innerHTML = "";
-    });
+    intervalId = setInterval(() => {
+      qrScanner.pause();
+      setTimeout(() => qrScanner.resume(), 300);
+    }, 5000);
   }
 
   function fetchData(carId) {
@@ -165,20 +156,14 @@
       });
   }
 
-  // 重新掃描按鈕
   document.getElementById("rescanBtn").addEventListener("click", () => {
     document.getElementById("resultArea").innerHTML = "";
     document.getElementById("carIdDisplay").innerText = "📷 等待重新掃描 QR Code...";
     document.getElementById("rescanBtn").style.display = "none";
-    stopScanner().then(() => startScanner());
+    qrScanner.clear();
+    startScanner();
   });
 
-  // 使用者切換頁面時自動釋放攝影機
-  document.addEventListener("visibilitychange", () => {
-    if (document.hidden) stopScanner();
-  });
-
-  // 啟動掃描
   startScanner();
 </script>
 
