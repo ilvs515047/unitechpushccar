@@ -100,8 +100,8 @@
 </div>
 
 <script>
-  const GAS_URL = "https://script.google.com/macros/s/AKfycbwAp9KJvUBW6VIlD5HU0OLX5r807nZ6AovBuZnRC2KKkeWro1FSdwP8nZCBcNi9GTYQeA/exec?mode=list";
-  const GAS_URL_SAVE = "https://script.google.com/macros/s/AKfycbwAp9KJvUBW6VIlD5HU0OLX5r807nZ6AovBuZnRC2KKkeWro1FSdwP8nZCBcNi9GTYQeA/exec";
+  const GAS_URL = "https://script.google.com/macros/s/AKfycbxBYOrRPbzVUeiZmJHvL17tPHt_lcyvr3R84Op-fY00Owq1ysr1sl-LFBvT-BfL_biTsQ/exec?mode=list";
+  const GAS_URL_SAVE = "https://script.google.com/macros/s/AKfycbxBYOrRPbzVUeiZmJHvL17tPHt_lcyvr3R84Op-fY00Owq1ysr1sl-LFBvT-BfL_biTsQ/exec";
 
   fetch(GAS_URL)
     .then(res => res.json())
@@ -109,7 +109,7 @@
       const head = document.getElementById("tableHead");
       const body = document.getElementById("tableBody");
 
-      // 建立表頭
+      // 表頭
       data.headers.forEach(h => {
         const th = document.createElement("th");
         th.textContent = h;
@@ -119,7 +119,7 @@
       thNote.textContent = "新增備註";
       head.appendChild(thNote);
 
-      // 建立每一列
+      // 每筆資料列
       data.records.forEach(row => {
         const tr = document.createElement("tr");
 
@@ -145,17 +145,20 @@
         status.textContent = "";
 
         btn.onclick = () => {
-          const carId = row[1]; // 第二欄為台車編號
+          const timestamp = row[0];  // 時間在第 0 欄
+          const carId = row[1];      // 台車編號在第 1 欄
           const note = input.value;
+
           if (!note.trim()) {
             status.textContent = "請輸入備註";
             status.style.color = "#dc3545";
             return;
           }
+
           fetch(GAS_URL_SAVE, {
             method: "POST",
             headers: { "Content-Type": "application/x-www-form-urlencoded" },
-            body: `mode=note&carId=${encodeURIComponent(carId)}&note=${encodeURIComponent(note)}`
+            body: `mode=note&carId=${encodeURIComponent(carId)}&timestamp=${encodeURIComponent(timestamp)}&note=${encodeURIComponent(note)}`
           })
           .then(res => res.text())
           .then(msg => {
