@@ -1,97 +1,97 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>UT 台車點檢表單</title>
-  <script src="https://unpkg.com/html5-qrcode"></script>
-  <style>
-    body {
-      font-family: "Segoe UI", "Microsoft JhengHei", sans-serif;
-      background-color: #f5f5f5;
-      padding: 20px;
-      margin: 0;
-    }
-    h2 {
-      text-align: center;
-      color: #333;
-    }
-    #reader {
-      width: 100%;
-      max-width: 320px;
-      margin: 0 auto 20px;
-    }
-    .status {
-      text-align: center;
-      font-weight: bold;
-      margin-bottom: 10px;
-    }
-    .card {
-      background-color: white;
-      border-radius: 12px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-      padding: 16px;
-      margin-bottom: 20px;
-    }
-    .card-title {
-      font-weight: bold;
-      margin-bottom: 8px;
-      color: #444;
-    }
-    label {
-      display: block;
-      margin-top: 8px;
-      font-size: 14px;
-    }
-    input[type="text"] {
-      width: 100%;
-      padding: 6px;
-      font-size: 14px;
-      margin-top: 4px;
-      border-radius: 6px;
-      border: 1px solid #ccc;
-    }
-    input[type="checkbox"] {
-      margin-right: 6px;
-    }
-    button {
-      width: 100%;
-      padding: 12px;
-      background-color: #28a745;
-      color: white;
-      border: none;
-      font-size: 16px;
-      border-radius: 8px;
-      cursor: pointer;
-    }
-    button:hover {
-      background-color: #218838;
-    }
-    #rescanBtn {
-      margin-top: 10px;
-      background-color: #007bff;
-    }
-    #rescanBtn:hover {
-      background-color: #0056b3;
-    }
-    #result {
-      text-align: center;
-      margin-top: 20px;
-      font-weight: bold;
-      color: #444;
-    }
-    #loadingOverlay {
-      position: fixed;
-      top: 0; left: 0; width: 100%; height: 100%;
-      background: rgba(0, 0, 0, 0.5);
-      color: white;
-      font-size: 22px;
-      display: none; /* 確保初始狀態是隱藏的 */
-      justify-content: center;
-      align-items: center;
-      z-index: 9999;
-    }
-  </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>UT 台車點檢表單</title>
+  <script src="https://unpkg.com/html5-qrcode"></script>
+  <style>
+    body {
+      font-family: "Segoe UI", "Microsoft JhengHei", sans-serif;
+      background-color: #f5f5f5;
+      padding: 20px;
+      margin: 0;
+    }
+    h2 {
+      text-align: center;
+      color: #333;
+    }
+    #reader {
+      width: 100%;
+      max-width: 320px;
+      margin: 0 auto 20px;
+    }
+    .status {
+      text-align: center;
+      font-weight: bold;
+      margin-bottom: 10px;
+    }
+    .card {
+      background-color: white;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      padding: 16px;
+      margin-bottom: 20px;
+    }
+    .card-title {
+      font-weight: bold;
+      margin-bottom: 8px;
+      color: #444;
+    }
+    label {
+      display: block;
+      margin-top: 8px;
+      font-size: 14px;
+    }
+    input[type="text"] {
+      width: 100%;
+      padding: 6px;
+      font-size: 14px;
+      margin-top: 4px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+    }
+    input[type="checkbox"] {
+      margin-right: 6px;
+    }
+    button {
+      width: 100%;
+      padding: 12px;
+      background-color: #28a745;
+      color: white;
+      border: none;
+      font-size: 16px;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #218838;
+    }
+    #rescanBtn {
+      margin-top: 10px;
+      background-color: #007bff;
+    }
+    #rescanBtn:hover {
+      background-color: #0056b3;
+    }
+    #result {
+      text-align: center;
+      margin-top: 20px;
+      font-weight: bold;
+      color: #444;
+    }
+    #loadingOverlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      color: white;
+      font-size: 22px;
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+    }
+  </style>
 </head>
 <body>
 
@@ -101,38 +101,38 @@
 <button id="rescanBtn" style="display:none;">🔄 重新掃描</button>
 
 <form id="checkForm" style="display:none;">
-  <div class="card">
-    <div class="card-title">👷‍♂️ 點檢人員工號</div>
-    <label><input type="text" name="workerId" required></label>
-  </div>
+  <div class="card">
+    <div class="card-title">👷‍♂️ 點檢人員工號</div>
+    <label><input type="text" name="workerId" required></label>
+  </div>
 
-  <div class="card">
-    <div class="card-title">🔧 前輪（轉向輪）</div>
-    <label>1. 焊接多少% <input type="text" name="f1"></label>
-    <label><input type="checkbox" name="f1_ok"> 無異常</label>
-    <label>2. 平台&車輪是否異常 <input type="text" name="f2"></label>
-    <label><input type="checkbox" name="f2_ok"> 無異常</label>
-    <label>3. 車輪/煞車描述 <input type="text" name="f3"></label>
-    <label><input type="checkbox" name="f3_ok"> 無異常</label>
-  </div>
+  <div class="card">
+    <div class="card-title">🔧 前輪（轉向輪）</div>
+    <label>1. 焊接多少% <input type="text" name="f1"></label>
+    <label><input type="checkbox" name="f1_ok"> 無異常</label>
+    <label>2. 平台&車輪是否異常 <input type="text" name="f2"></label>
+    <label><input type="checkbox" name="f2_ok"> 無異常</label>
+    <label>3. 車輪/煞車描述 <input type="text" name="f3"></label>
+    <label><input type="checkbox" name="f3_ok"> 無異常</label>
+  </div>
 
-  <div class="card">
-    <div class="card-title">🔧 後輪（手把端）</div>
-    <label>1. 焊接多少% <input type="text" name="b1"></label>
-    <label><input type="checkbox" name="b1_ok"> 無異常</label>
-    <label>2. 平台&車輪是否異常 <input type="text" name="b2"></label>
-    <label><input type="checkbox" name="b2_ok"> 無異常</label>
-    <label>3. 車輪/煞車描述 <input type="text" name="b3"></label>
-    <label><input type="checkbox" name="b3_ok"> 無異常</label>
-  </div>
+  <div class="card">
+    <div class="card-title">🔧 後輪（手把端）</div>
+    <label>1. 焊接多少% <input type="text" name="b1"></label>
+    <label><input type="checkbox" name="b1_ok"> 無異常</label>
+    <label>2. 平台&車輪是否異常 <input type="text" name="b2"></label>
+    <label><input type="checkbox" name="b2_ok"> 無異常</label>
+    <label>3. 車輪/煞車描述 <input type="text" name="b3"></label>
+    <label><input type="checkbox" name="b3_ok"> 無異常</label>
+  </div>
 
-  <div class="card">
-    <div class="card-title">🔧 車架/骨架接縫處</div>
-    <label>描述狀況 <input type="text" name="frame"></label>
-    <label><input type="checkbox" name="frame_ok"> 無異常</label>
-  </div>
+  <div class="card">
+    <div class="card-title">🔧 車架/骨架接縫處</div>
+    <label>描述狀況 <input type="text" name="frame"></label>
+    <label><input type="checkbox" name="frame_ok"> 無異常</label>
+  </div>
 
-  <button type="submit">✅ 提交點檢</button>
+  <button type="submit">✅ 提交點檢</button>
 </form>
 
 <p id="result"></p>
@@ -140,52 +140,106 @@
 <div id="loadingOverlay">⌛ 提交中...請稍候</div>
 
 <script>
-  const GAS_URL = "https://script.google.com/macros/s/AKfycbzq1aWVOAwWHp50RQEIz7vrm6nDBzX-Yrf-QX9PYddSL8JtTAun-NfwcoB2cocmqb0osQ/exec";
-  let scannedCarId = "";
-  let qrScanner;
-  let intervalId; // 這個變數目前沒有被清除，但因為 scan 成功後會 stop 攝影機，所以影響不大
+  const GAS_URL = "https://script.google.com/macros/s/AKfycbzq1aWVOAwWHp50RQEIz7vrm6nDBzX-Yrf-QX9PYddSL8JtTAun-NfwcoB2cocmqb0osQ/exec";
+  let scannedCarId = "";
+  let qrScanner;
+  let intervalId;
 
-  const startScan = () => {
-    // 每次重新掃描時都創建新的 Html5Qrcode 實例，確保清理舊的狀態
-    qrScanner = new Html5Qrcode("reader");
-    qrScanner.start(
-      { facingMode: "environment" },
-      {
-        fps: 5, // 降低幀率有助於減少效能負擔
-        qrbox: 250,
-        aspectRatio: 1.777,
-        videoConstraints: {
-          width: { ideal: 640 },
-          height: { ideal: 480 }
-        }
-      },
-      qrCodeMessage => {
-        scannedCarId = qrCodeMessage.trim();
-        document.getElementById("carIdDisplay").innerText = `📷 此為編號：「${scannedCarId}」的台車`;
-        qrScanner.stop();
-        // 掃描成功後，清除任何可能存在的 pause/resume interval
-        if (intervalId) {
-          clearInterval(intervalId);
-          intervalId = null;
-        }
-        document.getElementById("checkForm").style.display = "block";
-        document.getElementById("rescanBtn").style.display = "inline-block";
-      },
-      errorMessage => {
-        // 這裡可以選擇性地處理錯誤，例如 console.warn(errorMessage);
-      }
-    ).catch(err => {
-      document.getElementById("carIdDisplay").innerText = "❌ 無法啟用攝影機：" + err.message + " 請檢查權限。";
-      console.error("Html5Qrcode Start Error: ", err);
-    });
+  const startScan = () => {
+    qrScanner = new Html5Qrcode("reader");
+    qrScanner.start(
+      { facingMode: "environment" },
+      {
+        fps: 5,
+        qrbox: 250,
+        aspectRatio: 1.777,
+        videoConstraints: {
+          width: { ideal: 640 },
+          height: { ideal: 480 }
+        }
+      },
+      qrCodeMessage => {
+        scannedCarId = qrCodeMessage.trim();
+        document.getElementById("carIdDisplay").innerText = `📷 此為編號：「${scannedCarId}」的台車`;
+        qrScanner.stop();
+        clearInterval(intervalId);
+        document.getElementById("checkForm").style.display = "block";
+        document.getElementById("rescanBtn").style.display = "inline-block";
+      },
+      errorMessage => {}
+    ).catch(err => {
+      document.getElementById("carIdDisplay").innerText = "❌ 無法啟用攝影機：" + err;
+    });
 
-    // 這是為了改善卡頓的嘗試，但可能導致畫面閃爍。
-    // 如果降低 fps 已經足夠，可以考慮移除這個 interval。
-    // 確保在掃描成功或重新掃描時清除這個 interval。
-    if (intervalId) { // 先清除舊的 interval，避免重複啟動
-      clearInterval(intervalId);
-    }
-    intervalId = setInterval(() => {
-      if (qrScanner.is.</script>
+    intervalId = setInterval(() => {
+      qrScanner.pause();
+      setTimeout(() => qrScanner.resume(), 300);
+    }, 5000);
+  };
+
+  startScan();
+
+  document.getElementById("rescanBtn").addEventListener("click", () => {
+    document.getElementById("checkForm").style.display = "none";
+    document.getElementById("result").innerText = "";
+    document.getElementById("carIdDisplay").innerText = "📷 等待重新掃描 QR Code...";
+    document.getElementById("rescanBtn").style.display = "none";
+    qrScanner.clear();
+    startScan();
+  });
+
+  document.getElementById("checkForm").addEventListener("submit", function(e) {
+    e.preventDefault();
+    const requiredFields = [
+      "f1", "f1_ok", "f2", "f2_ok", "f3", "f3_ok",
+      "b1", "b1_ok", "b2", "b2_ok", "b3", "b3_ok",
+      "frame", "frame_ok"
+    ];
+    const formData = new FormData(this);
+    let allValid = true;
+
+    for (let i = 0; i < requiredFields.length; i += 2) {
+      const textVal = formData.get(requiredFields[i])?.trim();
+      const checkboxVal = formData.get(requiredFields[i + 1]);
+      if (!textVal && !checkboxVal) {
+        allValid = false;
+        break;
+      }
+    }
+
+    if (!allValid) {
+      alert("⚠️ 所有檢查項目都必須填寫文字或勾選無異常！");
+      return;
+    }
+
+    const data = {
+      mode: "checkin_detail",
+      carId: scannedCarId,
+      workerId: formData.get("workerId")?.trim() || ""
+    };
+    formData.delete("workerId");
+
+    for (const [key, val] of formData.entries()) {
+      data[key] = val || "";
+    }
+
+    // 顯示 loading
+    document.getElementById("loadingOverlay").style.display = "flex";
+
+    fetch(GAS_URL + "?" + new URLSearchParams(data))
+      .then(res => res.text())
+      .then(txt => {
+        document.getElementById("result").innerText = txt;
+        this.reset();
+        alert("✅ 點檢成功！");
+      })
+      .catch(err => {
+        document.getElementById("result").innerText = "❌ 點檢失敗：" + err.message;
+      })
+      .finally(() => {
+        document.getElementById("loadingOverlay").style.display = "none";
+      });
+  });
+</script>
 </body>
 </html>
