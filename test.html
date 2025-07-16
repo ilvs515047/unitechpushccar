@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>UT.台車點檢表單</title>
+  <title>UT 台車點檢表單</title>
   <script src="https://unpkg.com/html5-qrcode"></script>
   <style>
     body {
@@ -80,6 +80,18 @@
       font-weight: bold;
       color: #444;
     }
+    #loadingOverlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      color: white;
+      font-size: 22px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+    }
   </style>
 </head>
 <body>
@@ -126,6 +138,8 @@
 
 <p id="result"></p>
 
+<div id="loadingOverlay">⌛ 提交中...請稍候</div>
+
 <script>
   const GAS_URL = "https://script.google.com/macros/s/AKfycbzq1aWVOAwWHp50RQEIz7vrm6nDBzX-Yrf-QX9PYddSL8JtTAun-NfwcoB2cocmqb0osQ/exec";
   let scannedCarId = "";
@@ -158,12 +172,9 @@
       document.getElementById("carIdDisplay").innerText = "❌ 無法啟用攝影機：" + err;
     });
 
-    // ⏸ 每 5 秒暫停掃描 300ms
     intervalId = setInterval(() => {
       qrScanner.pause();
-      setTimeout(() => {
-        qrScanner.resume();
-      }, 300);
+      setTimeout(() => qrScanner.resume(), 300);
     }, 5000);
   };
 
@@ -213,6 +224,9 @@
       data[key] = val || "";
     }
 
+    // 顯示 loading
+    document.getElementById("loadingOverlay").style.display = "flex";
+
     fetch(GAS_URL + "?" + new URLSearchParams(data))
       .then(res => res.text())
       .then(txt => {
@@ -222,6 +236,9 @@
       })
       .catch(err => {
         document.getElementById("result").innerText = "❌ 點檢失敗：" + err.message;
+      })
+      .finally(() => {
+        document.getElementById("loadingOverlay").style.display = "none";
       });
   });
 </script>
