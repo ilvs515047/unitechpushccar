@@ -13,6 +13,7 @@
     h2 {
       text-align: center;
       margin-bottom: 20px;
+      color: #333;
     }
     #search {
       width: 100%;
@@ -44,12 +45,45 @@
     .container {
       overflow-x: auto;
     }
-    input[type="text"].note-input {
+
+    input.note-input {
       width: 70%;
+      padding: 6px 10px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      outline: none;
+      transition: 0.2s;
+      box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
     }
+
+    input.note-input:focus {
+      border-color: #66afe9;
+      box-shadow: 0 0 5px rgba(102,175,233,0.6);
+    }
+
     button.note-save {
       margin-left: 6px;
-      padding: 4px 8px;
+      padding: 6px 12px;
+      background-color: #ffc107;
+      color: #333;
+      font-weight: bold;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+
+    button.note-save:hover {
+      background-color: #ff9800;
+    }
+
+    .save-status {
+      display: inline-block;
+      margin-left: 8px;
+      font-size: 13px;
+      color: #28a745;
+      font-weight: bold;
+      transition: opacity 0.3s;
     }
   </style>
 </head>
@@ -75,7 +109,7 @@
       const head = document.getElementById("tableHead");
       const body = document.getElementById("tableBody");
 
-      // 表頭
+      // 建立表頭
       data.headers.forEach(h => {
         const th = document.createElement("th");
         th.textContent = h;
@@ -85,7 +119,7 @@
       thNote.textContent = "新增備註";
       head.appendChild(thNote);
 
-      // 每筆資料列
+      // 建立每一列
       data.records.forEach(row => {
         const tr = document.createElement("tr");
 
@@ -95,7 +129,7 @@
           tr.appendChild(td);
         });
 
-        // 備註欄（輸入框 + 儲存鈕）
+        // 備註輸入與儲存按鈕
         const tdNote = document.createElement("td");
         const input = document.createElement("input");
         input.type = "text";
@@ -105,11 +139,17 @@
         const btn = document.createElement("button");
         btn.textContent = "儲存";
         btn.className = "note-save";
+
+        const status = document.createElement("span");
+        status.className = "save-status";
+        status.textContent = "";
+
         btn.onclick = () => {
-          const carId = row[1]; // 假設第2欄為台車編號
+          const carId = row[1]; // 第二欄為台車編號
           const note = input.value;
           if (!note.trim()) {
-            alert("請輸入備註內容再儲存！");
+            status.textContent = "請輸入備註";
+            status.style.color = "#dc3545";
             return;
           }
           fetch(GAS_URL_SAVE, {
@@ -118,12 +158,21 @@
             body: `mode=note&carId=${encodeURIComponent(carId)}&note=${encodeURIComponent(note)}`
           })
           .then(res => res.text())
-          .then(msg => alert(msg))
-          .catch(err => alert("❌ 儲存失敗：" + err.message));
+          .then(msg => {
+            status.textContent = "✅ 已儲存！";
+            status.style.color = "#28a745";
+            input.value = "";
+            setTimeout(() => status.textContent = "", 3000);
+          })
+          .catch(err => {
+            status.textContent = "❌ 儲存失敗";
+            status.style.color = "#dc3545";
+          });
         };
 
         tdNote.appendChild(input);
         tdNote.appendChild(btn);
+        tdNote.appendChild(status);
         tr.appendChild(tdNote);
         body.appendChild(tr);
       });
