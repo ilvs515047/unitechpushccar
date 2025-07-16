@@ -90,7 +90,6 @@
 <button id="rescanBtn" style="display:none;">🔄 重新掃描</button>
 
 <form id="checkForm" style="display:none;">
-
   <div class="card">
     <div class="card-title">👷‍♂️ 點檢人員工號</div>
     <label><input type="text" name="workerId" required></label>
@@ -130,16 +129,27 @@
 <script>
   const GAS_URL = "https://script.google.com/macros/s/AKfycbzq1aWVOAwWHp50RQEIz7vrm6nDBzX-Yrf-QX9PYddSL8JtTAun-NfwcoB2cocmqb0osQ/exec";
   let scannedCarId = "";
+  let qrScanner;
+  let intervalId;
 
-  const qrScanner = new Html5Qrcode("reader");
   const startScan = () => {
+    qrScanner = new Html5Qrcode("reader");
     qrScanner.start(
       { facingMode: "environment" },
-      { fps: 10, qrbox: 250 },
+      {
+        fps: 5,
+        qrbox: 250,
+        aspectRatio: 1.777,
+        videoConstraints: {
+          width: { ideal: 640 },
+          height: { ideal: 480 }
+        }
+      },
       qrCodeMessage => {
         scannedCarId = qrCodeMessage.trim();
         document.getElementById("carIdDisplay").innerText = `📷 此為編號：「${scannedCarId}」的台車`;
         qrScanner.stop();
+        clearInterval(intervalId);
         document.getElementById("checkForm").style.display = "block";
         document.getElementById("rescanBtn").style.display = "inline-block";
       },
@@ -147,7 +157,16 @@
     ).catch(err => {
       document.getElementById("carIdDisplay").innerText = "❌ 無法啟用攝影機：" + err;
     });
+
+    // ⏸ 每 5 秒暫停掃描 300ms
+    intervalId = setInterval(() => {
+      qrScanner.pause();
+      setTimeout(() => {
+        qrScanner.resume();
+      }, 300);
+    }, 5000);
   };
+
   startScan();
 
   document.getElementById("rescanBtn").addEventListener("click", () => {
@@ -155,18 +174,17 @@
     document.getElementById("result").innerText = "";
     document.getElementById("carIdDisplay").innerText = "📷 等待重新掃描 QR Code...";
     document.getElementById("rescanBtn").style.display = "none";
+    qrScanner.clear();
     startScan();
   });
 
   document.getElementById("checkForm").addEventListener("submit", function(e) {
     e.preventDefault();
-
     const requiredFields = [
       "f1", "f1_ok", "f2", "f2_ok", "f3", "f3_ok",
       "b1", "b1_ok", "b2", "b2_ok", "b3", "b3_ok",
       "frame", "frame_ok"
     ];
-
     const formData = new FormData(this);
     let allValid = true;
 
