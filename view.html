@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>台車點檢紀錄查詢</title>
+  <title>UT台車點檢紀錄查詢</title>
   <script src="https://unpkg.com/html5-qrcode"></script>
   <style>
     body {
       font-family: "Segoe UI", "Microsoft JhengHei", sans-serif;
       background-color: #f7f7f7;
-      margin: 0;
       padding: 20px;
+      margin: 0;
     }
     h2 {
       text-align: center;
@@ -21,7 +21,7 @@
       max-width: 320px;
       margin: 0 auto 20px;
     }
-    #carIdDisplay {
+    .status {
       text-align: center;
       font-weight: bold;
       margin-bottom: 10px;
@@ -29,42 +29,61 @@
     .card {
       background-color: white;
       border-radius: 12px;
-      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
       padding: 16px;
       margin-bottom: 16px;
     }
     .card-title {
       font-weight: bold;
-      color: #444;
-      margin-bottom: 8px;
+      color: #555;
+      margin-bottom: 6px;
     }
     .card-content {
-      color: #222;
       font-size: 15px;
+      color: #222;
       word-wrap: break-word;
     }
-    .date {
+    .info {
       text-align: center;
-      font-size: 14px;
-      color: #555;
-      margin-bottom: 20px;
+      font-size: 15px;
+      margin-bottom: 16px;
+      color: #444;
     }
     .error {
       color: red;
       text-align: center;
+      font-weight: bold;
+    }
+    button {
+      width: 100%;
+      padding: 12px;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      font-size: 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      margin-top: 12px;
+    }
+    button:hover {
+      background-color: #0056b3;
     }
   </style>
 </head>
 <body>
-  <h2>📋 台車點檢紀錄查詢</h2>
-  <div id="reader"></div>
-  <p id="carIdDisplay">📷 等待掃描 QR Code...</p>
-  <div id="resultArea"></div>
 
-  <script>
-    const GAS_URL = "https://script.google.com/macros/s/AKfycbzq1aWVOAwWHp50RQEIz7vrm6nDBzX-Yrf-QX9PYddSL8JtTAun-NfwcoB2cocmqb0osQ/exec";
+<h2>📋 UT台車點檢紀錄查詢</h2>
+<div id="reader"></div>
+<p id="carIdDisplay" class="status">📷 等待掃描 QR Code...</p>
+<div id="resultArea"></div>
+<button id="rescanBtn" style="display:none;">🔄 重新掃描</button>
 
-    const qrScanner = new Html5Qrcode("reader");
+<script>
+  const GAS_URL = "https://script.google.com/macros/s/AKfycbx4SpWKpKqPhADrIn1KSVZRIK2Fv7mcw-lMKOprCmASQhtJONilxXuM5wI1MSsnKRhlFA/exec";
+
+  const qrScanner = new Html5Qrcode("reader");
+
+  const startScan = () => {
     qrScanner.start(
       { facingMode: "environment" },
       { fps: 10, qrbox: 250 },
@@ -72,37 +91,58 @@
         const carId = qrCodeMessage.trim();
         document.getElementById("carIdDisplay").innerText = `🚚 台車編號：${carId}`;
         qrScanner.stop();
-
-        const url = `${GAS_URL}?mode=view&carId=${encodeURIComponent(carId)}`;
-        fetch(url)
-          .then(res => {
-            if (res.headers.get("content-type")?.includes("application/json")) {
-              return res.json();
-            } else {
-              return res.text().then(t => { throw new Error(t); });
-            }
-          })
-          .then(data => {
-            const resultArea = document.getElementById("resultArea");
-            resultArea.innerHTML = `<div class="date">📅 最近點檢日期：${data.date}</div>`;
-            for (let i = 0; i < data.headers.length; i++) {
-              const card = document.createElement("div");
-              card.className = "card";
-              card.innerHTML = `
-                <div class="card-title">${data.headers[i]}</div>
-                <div class="card-content">${data.values[i] || "-"}</div>
-              `;
-              resultArea.appendChild(card);
-            }
-          })
-          .catch(err => {
-            document.getElementById("resultArea").innerHTML = `<p class="error">❌ 查詢失敗：${err.message}</p>`;
-          });
+        fetchData(carId);
       },
       errorMessage => {}
     ).catch(err => {
       document.getElementById("carIdDisplay").innerText = "❌ 無法啟用攝影機：" + err;
     });
-  </script>
+  };
+  startScan();
+
+  document.getElementById("rescanBtn").addEventListener("click", () => {
+    document.getElementById("resultArea").innerHTML = "";
+    document.getElementById("carIdDisplay").innerText = "📷 等待重新掃描 QR Code...";
+    document.getElementById("rescanBtn").style.display = "none";
+    startScan();
+  });
+
+  function fetchData(carId) {
+    const url = `${GAS_URL}?mode=view&carId=${encodeURIComponent(carId)}`;
+    fetch(url)
+      .then(res => {
+        if (res.headers.get("content-type")?.includes("application/json")) {
+          return res.json();
+        } else {
+          return res.text().then(t => { throw new Error(t); });
+        }
+      })
+      .then(data => {
+        const resultArea = document.getElementById("resultArea");
+        resultArea.innerHTML = "";
+
+        resultArea.innerHTML += `
+          <div class="info">📅 點檢日期：${data.date}</div>
+          <div class="info">👷‍♂️ 點檢人員工號：${data.values[0] || "-"}</div>
+        `;
+
+        for (let i = 1; i < data.headers.length; i++) {
+          const card = document.createElement("div");
+          card.className = "card";
+          card.innerHTML = `
+            <div class="card-title">${data.headers[i]}</div>
+            <div class="card-content">${data.values[i] || "-"}</div>
+          `;
+          resultArea.appendChild(card);
+        }
+
+        document.getElementById("rescanBtn").style.display = "inline-block";
+      })
+      .catch(err => {
+        document.getElementById("resultArea").innerHTML = `<p class="error">❌ 查詢失敗：${err.message}</p>`;
+      });
+  }
+</script>
+
 </body>
 </html>
