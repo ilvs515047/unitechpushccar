@@ -93,60 +93,45 @@
 
 <script>
   const GAS_URL = "https://script.google.com/macros/s/AKfycbx4SpWKpKqPhADrIn1KSVZRIK2Fv7mcw-lMKOprCmASQhtJONilxXuM5wI1MSsnKRhlFA/exec";
-  let scannerInstance = null;
+  let scanner = null;
 
-  // 初始化並開始 QR 掃描器
   function startScanner() {
-    // 清空讀取器畫面與先前殘留的 video
-    const readerContainer = document.getElementById("reader");
-    readerContainer.innerHTML = "";
+    const reader = document.getElementById("reader");
+    reader.innerHTML = ""; // 保險清除殘留 DOM
 
-    // 建立新實例
-    scannerInstance = new Html5Qrcode("reader");
-
-    scannerInstance.start(
+    scanner = new Html5Qrcode("reader");
+    scanner.start(
       { facingMode: "environment" },
       {
-        fps: 5,
-        qrbox: 250,
-        videoConstraints: { width: { ideal: 640 }, height: { ideal: 480 } }
+        fps: 2,
+        qrbox: 250
+        // 移除 videoConstraints，避免硬壓解析度造成卡頓
       },
       qrCodeMessage => {
         const carId = qrCodeMessage.trim();
         document.getElementById("carIdDisplay").innerText = `🚚 台車編號：${carId}`;
-
-        // 停止掃描器並查詢資料
-        stopScanner().then(() => {
-          fetchData(carId);
-        });
+        stopScanner().then(() => fetchData(carId));
       },
-      errorMessage => {
-        // 可忽略持續性錯誤，例如偵測不到
-      }
+      errorMessage => {}
     ).catch(err => {
       document.getElementById("carIdDisplay").innerText = "❌ 無法啟用攝影機：" + err;
     });
   }
 
-  // 安全停止並清除掃描器（若存在）
   function stopScanner() {
-    if (scannerInstance) {
-      return scannerInstance.stop().then(() => {
-        return scannerInstance.clear().then(() => {
-          scannerInstance = null;
-          document.getElementById("reader").innerHTML = "";
-        });
-      }).catch(err => {
-        console.warn("⚠️ 停止掃描器時發生錯誤：", err);
-        scannerInstance = null;
+    if (!scanner) return Promise.resolve();
+    return scanner.stop().then(() => {
+      return scanner.clear().then(() => {
+        scanner = null;
         document.getElementById("reader").innerHTML = "";
       });
-    } else {
-      return Promise.resolve(); // 沒有掃描器就直接 resolve
-    }
+    }).catch(err => {
+      console.warn("⚠️ 停止掃描器時錯誤：", err);
+      scanner = null;
+      document.getElementById("reader").innerHTML = "";
+    });
   }
 
-  // 查詢資料顯示
   function fetchData(carId) {
     const overlay = document.getElementById("loadingOverlay");
     overlay.style.display = "flex";
@@ -170,7 +155,6 @@
             </div>
           `;
         }
-
         document.getElementById("rescanBtn").style.display = "inline-block";
       })
       .catch(err => {
@@ -181,18 +165,20 @@
       });
   }
 
-  // 點擊「重新掃描」
+  // 重新掃描按鈕
   document.getElementById("rescanBtn").addEventListener("click", () => {
     document.getElementById("resultArea").innerHTML = "";
     document.getElementById("carIdDisplay").innerText = "📷 等待重新掃描 QR Code...";
     document.getElementById("rescanBtn").style.display = "none";
-
-    stopScanner().then(() => {
-      startScanner();
-    });
+    stopScanner().then(() => startScanner());
   });
 
-  // 初始啟動
+  // 使用者切換頁面時自動釋放攝影機
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) stopScanner();
+  });
+
+  // 啟動掃描
   startScanner();
 </script>
 
