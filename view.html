@@ -69,14 +69,13 @@
       background-color: #0056b3;
     }
     #loadingOverlay {
-      display: none; /* 修改點：已移除此處多餘的 display: flex; */
+      display: none;
       position: fixed;
       top: 0; left: 0;
       width: 100%; height: 100%;
       background: rgba(0, 0, 0, 0.4);
       color: white;
       font-size: 20px;
-      /* 以下為 flex 相關設定，由 JS 動態加上 display: flex 時才會生效 */
       justify-content: center;
       align-items: center;
       z-index: 999;
@@ -94,12 +93,11 @@
 
 <script>
   const GAS_URL = "https://script.google.com/macros/s/AKfycbx4SpWKpKqPhADrIn1KSVZRIK2Fv7mcw-lMKOprCmASQhtJONilxXuM5wI1MSsnKRhlFA/exec";
-
   let qrScanner;
-  let intervalId;
 
   function startScanner() {
     qrScanner = new Html5Qrcode("reader");
+
     qrScanner.start(
       { facingMode: "environment" },
       {
@@ -110,24 +108,19 @@
       qrCodeMessage => {
         const carId = qrCodeMessage.trim();
         document.getElementById("carIdDisplay").innerText = `🚚 台車編號：${carId}`;
-        qrScanner.stop();
-        clearInterval(intervalId);
-        fetchData(carId);
+        qrScanner.stop().then(() => {
+          fetchData(carId);
+        });
       },
-      errorMessage => { }
+      errorMessage => { /* 忽略掃描錯誤訊息 */ }
     ).catch(err => {
       document.getElementById("carIdDisplay").innerText = "❌ 無法啟用攝影機：" + err;
     });
-
-    intervalId = setInterval(() => {
-      qrScanner.pause();
-      setTimeout(() => qrScanner.resume(), 300);
-    }, 5000);
   }
 
   function fetchData(carId) {
     const overlay = document.getElementById("loadingOverlay");
-    overlay.style.display = "flex"; // 在這裡動態顯示
+    overlay.style.display = "flex";
 
     const url = `${GAS_URL}?mode=view&carId=${encodeURIComponent(carId)}`;
     fetch(url)
@@ -138,7 +131,6 @@
           <div class="info">📅 點檢日期：${data.date}</div>
           <div class="info">👷‍♂️ 點檢人員工號：${data.values[0] || "-"}</div>
         `;
-
         for (let i = 1; i < data.headers.length; i++) {
           resultArea.innerHTML += `
             <div class="card">
@@ -147,14 +139,13 @@
             </div>
           `;
         }
-
         document.getElementById("rescanBtn").style.display = "inline-block";
       })
       .catch(err => {
         document.getElementById("resultArea").innerHTML = `<p class="error">❌ 查詢失敗：${err.message}</p>`;
       })
       .finally(() => {
-        overlay.style.display = "none"; // 查詢結束後隱藏
+        overlay.style.display = "none";
       });
   }
 
@@ -162,14 +153,12 @@
     document.getElementById("resultArea").innerHTML = "";
     document.getElementById("carIdDisplay").innerText = "📷 等待重新掃描 QR Code...";
     document.getElementById("rescanBtn").style.display = "none";
-    qrScanner.clear();
-    startScanner();
+    qrScanner.clear().then(() => startScanner());
   });
 
-  // 初始化
+  // 初始化啟動
   startScanner();
 </script>
 
 </body>
 </html>
-```
