@@ -81,31 +81,41 @@
 <script>
   const GAS_URL = "https://script.google.com/macros/s/AKfycbx4SpWKpKqPhADrIn1KSVZRIK2Fv7mcw-lMKOprCmASQhtJONilxXuM5wI1MSsnKRhlFA/exec";
 
-  const qrScanner = new Html5Qrcode("reader");
+  let qrScanner;
+  let intervalId;
 
-  const startScan = () => {
+  function startScanner() {
+    qrScanner = new Html5Qrcode("reader");
     qrScanner.start(
       { facingMode: "environment" },
-      { fps: 10, qrbox: 250 },
+      {
+        fps: 5,
+        qrbox: 250,
+        videoConstraints: {
+          width: { ideal: 640 },
+          height: { ideal: 480 }
+        }
+      },
       qrCodeMessage => {
         const carId = qrCodeMessage.trim();
         document.getElementById("carIdDisplay").innerText = `🚚 台車編號：${carId}`;
         qrScanner.stop();
+        clearInterval(intervalId);
         fetchData(carId);
       },
-      errorMessage => {}
+      errorMessage => { }
     ).catch(err => {
       document.getElementById("carIdDisplay").innerText = "❌ 無法啟用攝影機：" + err;
     });
-  };
-  startScan();
 
-  document.getElementById("rescanBtn").addEventListener("click", () => {
-    document.getElementById("resultArea").innerHTML = "";
-    document.getElementById("carIdDisplay").innerText = "📷 等待重新掃描 QR Code...";
-    document.getElementById("rescanBtn").style.display = "none";
-    startScan();
-  });
+    // 每 5 秒 pause + resume 一次緩解卡頓
+    intervalId = setInterval(() => {
+      qrScanner.pause();
+      setTimeout(() => {
+        qrScanner.resume();
+      }, 300);
+    }, 5000);
+  }
 
   function fetchData(carId) {
     const url = `${GAS_URL}?mode=view&carId=${encodeURIComponent(carId)}`;
@@ -119,21 +129,18 @@
       })
       .then(data => {
         const resultArea = document.getElementById("resultArea");
-        resultArea.innerHTML = "";
-
-        resultArea.innerHTML += `
+        resultArea.innerHTML = `
           <div class="info">📅 點檢日期：${data.date}</div>
           <div class="info">👷‍♂️ 點檢人員工號：${data.values[0] || "-"}</div>
         `;
 
         for (let i = 1; i < data.headers.length; i++) {
-          const card = document.createElement("div");
-          card.className = "card";
-          card.innerHTML = `
-            <div class="card-title">${data.headers[i]}</div>
-            <div class="card-content">${data.values[i] || "-"}</div>
+          resultArea.innerHTML += `
+            <div class="card">
+              <div class="card-title">${data.headers[i]}</div>
+              <div class="card-content">${data.values[i] || "-"}</div>
+            </div>
           `;
-          resultArea.appendChild(card);
         }
 
         document.getElementById("rescanBtn").style.display = "inline-block";
@@ -142,6 +149,17 @@
         document.getElementById("resultArea").innerHTML = `<p class="error">❌ 查詢失敗：${err.message}</p>`;
       });
   }
+
+  document.getElementById("rescanBtn").addEventListener("click", () => {
+    document.getElementById("resultArea").innerHTML = "";
+    document.getElementById("carIdDisplay").innerText = "📷 等待重新掃描 QR Code...";
+    document.getElementById("rescanBtn").style.display = "none";
+    qrScanner.clear();
+    startScanner();
+  });
+
+  // 一開始就啟動掃描
+  startScanner();
 </script>
 
 </body>
