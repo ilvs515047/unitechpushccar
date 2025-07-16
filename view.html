@@ -93,34 +93,53 @@
 
 <script>
   const GAS_URL = "https://script.google.com/macros/s/AKfycbx4SpWKpKqPhADrIn1KSVZRIK2Fv7mcw-lMKOprCmASQhtJONilxXuM5wI1MSsnKRhlFA/exec";
-  let qrScanner;
-  let intervalId;
+  let scanner = null;
+  let scannerTimer = null;
 
   function startScanner() {
-    qrScanner = new Html5Qrcode("reader");
-    qrScanner.start(
+    const reader = document.getElementById("reader");
+    reader.innerHTML = "";
+
+    scanner = new Html5Qrcode("reader");
+
+    scanner.start(
       { facingMode: "environment" },
       {
-        fps: 5,
-        qrbox: 250,
-        videoConstraints: { width: { ideal: 640 }, height: { ideal: 480 } }
+        fps: 2,
+        qrbox: 250
       },
       qrCodeMessage => {
         const carId = qrCodeMessage.trim();
         document.getElementById("carIdDisplay").innerText = `🚚 台車編號：${carId}`;
-        qrScanner.stop();
-        clearInterval(intervalId);
-        fetchData(carId);
+        clearInterval(scannerTimer); // ✅ 停止定時器
+        stopScanner().then(() => fetchData(carId));
       },
       errorMessage => {}
     ).catch(err => {
-      document.getElementById("carIdDisplay").innerText = "❌ 無法啟用攝影機：" + err;
+      document.getElementById("carIdDisplay").innerText = "❌ 攝影機錯誤：" + err;
     });
+  }
 
-    intervalId = setInterval(() => {
-      qrScanner.pause();
-      setTimeout(() => qrScanner.resume(), 300);
-    }, 5000);
+  function stopScanner() {
+    if (!scanner) return Promise.resolve();
+    return scanner.stop().then(() => {
+      return scanner.clear().then(() => {
+        scanner = null;
+        document.getElementById("reader").innerHTML = "";
+      });
+    }).catch(err => {
+      console.warn("⚠️ 停止失敗：", err);
+      scanner = null;
+      document.getElementById("reader").innerHTML = "";
+    });
+  }
+
+  function restartScannerLoop() {
+    clearInterval(scannerTimer);
+    startScanner();
+    scannerTimer = setInterval(() => {
+      stopScanner().then(() => startScanner());
+    }, 2000); // ✅ 每 2 秒重啟掃描器
   }
 
   function fetchData(carId) {
@@ -160,11 +179,11 @@
     document.getElementById("resultArea").innerHTML = "";
     document.getElementById("carIdDisplay").innerText = "📷 等待重新掃描 QR Code...";
     document.getElementById("rescanBtn").style.display = "none";
-    qrScanner.clear();
-    startScanner();
+    restartScannerLoop(); // ✅ 重新啟動定時掃描循環
   });
 
-  startScanner();
+  // 初始啟動掃描循環
+  restartScannerLoop();
 </script>
 
 </body>
