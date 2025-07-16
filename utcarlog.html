@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>📋 台車點檢紀錄總覽</title>
+  <style>
+    body {
+      font-family: "Segoe UI", "Microsoft JhengHei", sans-serif;
+      margin: 0; padding: 20px;
+      background-color: #f5faff;
+    }
+    h2 {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    #search {
+      width: 100%;
+      max-width: 300px;
+      margin: 0 auto 16px;
+      display: block;
+      padding: 8px 12px;
+      font-size: 16px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+      font-size: 14px;
+    }
+    th, td {
+      border: 1px solid #ddd;
+      padding: 8px;
+      text-align: center;
+    }
+    th {
+      background-color: #ffdd99;
+    }
+    tr:nth-child(even) {
+      background-color: #fdf6ea;
+    }
+    .container {
+      overflow-x: auto;
+    }
+  </style>
+</head>
+<body>
+
+<h2>📋 台車點檢紀錄總覽</h2>
+<input type="text" id="search" placeholder="🔍 搜尋台車編號、工號、內容…">
+
+<div class="container">
+  <table id="recordTable">
+    <thead><tr id="tableHead"></tr></thead>
+    <tbody id="tableBody"></tbody>
+  </table>
+</div>
+
+<script>
+  const GAS_URL = "https://script.google.com/macros/s/AKfycbypNbsrpygXQiQVublLD-bexgyIScWYEl6qIZw8B9cXTKZOFED6TO_99hFBjRLy2CDijA/exec";
+
+  fetch(GAS_URL)
+    .then(res => res.json())
+    .then(data => {
+      const head = document.getElementById("tableHead");
+      const body = document.getElementById("tableBody");
+
+      data.headers.forEach(h => {
+        const th = document.createElement("th");
+        th.textContent = h;
+        head.appendChild(th);
+      });
+
+      data.records.forEach(row => {
+        const tr = document.createElement("tr");
+        row.forEach(cell => {
+          const td = document.createElement("td");
+          td.textContent = cell || "-";
+          tr.appendChild(td);
+        });
+        body.appendChild(tr);
+      });
+
+      // 加入搜尋功能
+      document.getElementById("search").addEventListener("input", e => {
+        const keyword = e.target.value.trim().toLowerCase();
+        Array.from(body.rows).forEach(row => {
+          const match = Array.from(row.cells).some(cell =>
+            cell.textContent.toLowerCase().includes(keyword)
+          );
+          row.style.display = match ? "" : "none";
+        });
+      });
+    })
+    .catch(err => {
+      alert("❌ 無法載入資料：" + err.message);
+    });
+</script>
+
+</body>
+</html>
