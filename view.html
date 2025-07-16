@@ -20,6 +20,8 @@
       width: 100%;
       max-width: 320px;
       margin: 0 auto 20px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
     }
     .status {
       text-align: center;
@@ -84,7 +86,7 @@
 </head>
 <body>
 
-<h2>📋 UT台車點檢紀錄查詢.</h2>
+<h2>📋 UT台車點檢紀錄查詢U</h2>
 <div id="reader"></div>
 <p id="carIdDisplay" class="status">📷 等待掃描 QR Code...</p>
 <div id="resultArea"></div>
@@ -93,36 +95,35 @@
 
 <script>
   const GAS_URL = "https://script.google.com/macros/s/AKfycbx4SpWKpKqPhADrIn1KSVZRIK2Fv7mcw-lMKOprCmASQhtJONilxXuM5wI1MSsnKRhlFA/exec";
-  let scanner = null;
+  
+  // 1. 將掃描器物件的建立移到全域，只建立一次，避免重複建立造成資源衝突
+  const scanner = new Html5Qrcode("reader");
 
+  // 2. 定義掃描成功時要執行的動作
+  const onScanSuccess = (qrCodeMessage) => {
+    const carId = qrCodeMessage.trim();
+    document.getElementById("carIdDisplay").innerText = `🚚 台車編號：${carId}`;
+    
+    // 3. 停止掃描即可，不需 clear()，因為我們要重複使用 scanner 物件
+    scanner.stop().then(() => {
+      fetchData(carId);
+    }).catch(err => console.error("停止掃描失敗:", err));
+  };
+  
+  // 4. 定義掃描失敗時的動作 (可選，通常保持空白即可)
+  const onScanFailure = (errorMessage) => {
+    // 忽略找不到 QR code 的瞬間錯誤
+  };
+
+  // 5. 簡化啟動函式，直接呼叫 start 方法
   function startScanner() {
-    if (scanner) {
-      scanner.clear().then(() => initScanner());
-    } else {
-      initScanner();
-    }
-  }
+    const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+    const cameraConfig = { facingMode: "environment" };
 
-  function initScanner() {
-    scanner = new Html5Qrcode("reader");
-
-    scanner.start(
-      { facingMode: "environment" },
-      { fps: 10, qrbox: 250 },
-      qrCodeMessage => {
-        const carId = qrCodeMessage.trim();
-        document.getElementById("carIdDisplay").innerText = `🚚 台車編號：${carId}`;
-        scanner.stop().then(() => {
-          scanner.clear();
-          fetchData(carId);
-        });
-      },
-      errorMessage => {
-        // 可忽略掃描失敗的瞬間錯誤（例如偵測不到）
-      }
-    ).catch(err => {
-      document.getElementById("carIdDisplay").innerText = "❌ 攝影機啟用錯誤：" + err;
-    });
+    scanner.start(cameraConfig, config, onScanSuccess, onScanFailure)
+      .catch(err => {
+        document.getElementById("carIdDisplay").innerText = "❌ 攝影機啟用錯誤：" + err;
+      });
   }
 
   function fetchData(carId) {
@@ -135,6 +136,9 @@
         ? res.json()
         : res.text().then(t => { throw new Error(t); }))
       .then(data => {
+        if (data.error) { // 處理 GAS 回傳的錯誤訊息
+          throw new Error(data.error);
+        }
         const resultArea = document.getElementById("resultArea");
         resultArea.innerHTML = `
           <div class="info">📅 點檢日期：${data.date}</div>
@@ -148,28 +152,28 @@
             </div>
           `;
         }
-        document.getElementById("rescanBtn").style.display = "inline-block";
+        document.getElementById("rescanBtn").style.display = "block";
       })
       .catch(err => {
         document.getElementById("resultArea").innerHTML = `<p class="error">❌ 查詢失敗：${err.message}</p>`;
+        document.getElementById("rescanBtn").style.display = "block"; // 查詢失敗也顯示重掃按鈕
       })
       .finally(() => {
         overlay.style.display = "none";
       });
   }
 
+  // 6. 重新掃描按鈕的事件監聽器
   document.getElementById("rescanBtn").addEventListener("click", () => {
     document.getElementById("resultArea").innerHTML = "";
     document.getElementById("carIdDisplay").innerText = "📷 等待重新掃描 QR Code...";
     document.getElementById("rescanBtn").style.display = "none";
-    startScanner();
+    startScanner(); // 直接呼叫啟動函式，重複使用同一個 scanner 物件
   });
 
-  // ✅ 初始化啟動
+  // ✅ 頁面載入後，自動啟動掃描器
   startScanner();
 </script>
-
-
 
 </body>
 </html>
