@@ -150,34 +150,34 @@
 
   // ✅ 根據快取資料與表頭顯示結果
   function displayResultFromCache(carId) {
-    const idx = headers.indexOf("台車編號");
-    if (idx === -1) {
-      document.getElementById("resultArea").innerHTML = `<p class="error">❌ 查無欄位「台車編號」</p>`;
-      return;
-    }
+  // 找出所有相符紀錄，並依時間排序（新→舊）
+  const matches = allRecords
+    .filter(r => r.carId === carId)
+    .sort((a, b) => new Date(b.time) - new Date(a.time)); // 假設 time 格式為 "yyyy-MM-dd HH:mm:ss"
 
-    const result = allRecords.find(row => row[idx] === carId);
-    const resultArea = document.getElementById("resultArea");
+  const result = matches[0]; // 最新那一筆
+  const resultArea = document.getElementById("resultArea");
 
-    if (!result) {
-      resultArea.innerHTML = `<p class="error">❌ 查無 ${carId} 的點檢資料</p>`;
-      document.getElementById("rescanBtn").style.display = "inline-block";
-      return;
-    }
-
-    resultArea.innerHTML = `<div class="info">📅 點檢日期：${result[0]}</div>`;
-
-    for (let i = 1; i < headers.length; i++) {
-      resultArea.innerHTML += `
-        <div class="card">
-          <div class="card-title">${headers[i]}</div>
-          <div class="card-content">${result[i] || "-"}</div>
-        </div>
-      `;
-    }
-
+  if (!result) {
+    resultArea.innerHTML = `<p class="error">❌ 查無 ${carId} 的點檢資料</p>`;
     document.getElementById("rescanBtn").style.display = "inline-block";
+    return;
   }
+
+  resultArea.innerHTML = `<div class="info">📅 點檢時間：${result.time}</div>`;
+
+  const fields = Object.entries(result).filter(([key]) => !['carId', 'time'].includes(key));
+  for (const [key, val] of fields) {
+    resultArea.innerHTML += `
+      <div class="card">
+        <div class="card-title">${key}</div>
+        <div class="card-content">${val || "-"}</div>
+      </div>
+    `;
+  }
+
+  document.getElementById("rescanBtn").style.display = "inline-block";
+}
 
   document.getElementById("rescanBtn").addEventListener("click", () => {
     document.getElementById("resultArea").innerHTML = "";
