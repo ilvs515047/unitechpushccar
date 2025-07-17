@@ -148,28 +148,29 @@
 
   // ✅ 本地快取查詢資料
   function displayResultFromCache(carId) {
-    const result = allRecords.find(r => r.carId === carId);
-    const resultArea = document.getElementById("resultArea");
+  const result = allRecords.find(r => r.carId === carId);
+  const resultArea = document.getElementById("resultArea");
 
-    if (!result) {
-      resultArea.innerHTML = `<p class="error">❌ 查無 ${carId} 的點檢資料</p>`;
-      return;
-    }
-
-    resultArea.innerHTML = `<div class="info">📅 點檢日期：${result.date}</div>`;
-
-    const fields = Object.entries(result).filter(([key]) => !['carId', 'date'].includes(key));
-    for (const [key, val] of fields) {
-      resultArea.innerHTML += `
-        <div class="card">
-          <div class="card-title">${key}</div>
-          <div class="card-content">${val || "-"}</div>
-        </div>
-      `;
-    }
-
-    document.getElementById("rescanBtn").style.display = "inline-block";
+  if (!result) {
+    resultArea.innerHTML = `<p class="error">❌ 查無 ${carId} 的點檢資料</p>`;
+    document.getElementById("rescanBtn").style.display = "inline-block"; // 👈 加這行
+    return;
   }
+
+  resultArea.innerHTML = `<div class="info">📅 點檢日期：${result.date}</div>`;
+
+  const fields = Object.entries(result).filter(([key]) => !['carId', 'date'].includes(key));
+  for (const [key, val] of fields) {
+    resultArea.innerHTML += `
+      <div class="card">
+        <div class="card-title">${key}</div>
+        <div class="card-content">${val || "-"}</div>
+      </div>
+    `;
+  }
+
+  document.getElementById("rescanBtn").style.display = "inline-block";
+}
 
   document.getElementById("rescanBtn").addEventListener("click", () => {
     document.getElementById("resultArea").innerHTML = "";
