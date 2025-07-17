@@ -92,16 +92,18 @@
 <div id="loadingOverlay">👌 資料庫載入中，等等喔，會花點時間但可以快速查詢...</div>
 
 <script>
-  const GAS_URL = "https://script.google.com/macros/s/AKfycbxoeN1rp8g9BS1LSPdSesOPfBs68E7ha4uIh2w60Z-Lx38nvgfpLy-pinO7psFezQRbLw/exec";
+  const GAS_URL = "https://script.google.com/macros/s/AKfycbzMgasc2kdRC_GyNKJA_ysw95zOaqMIMQ0aN8BcMT9nmk9iEa46-Fh7IoxTGYUsnsNTMQ/exec";
   let allRecords = [];
+  let headers = [];
   let scannedCarId = "";
 
   // ✅ 一開始預載所有資料
   function preloadData() {
-    fetch(`${GAS_URL}?mode=all`)
+    fetch(`${GAS_URL}?mode=list`)
       .then(res => res.json())
       .then(data => {
         allRecords = data.records || [];
+        headers = data.headers || [];
         document.getElementById("loadingOverlay").style.display = "none";
         startScanner();
       })
@@ -146,31 +148,36 @@
     });
   }
 
-  // ✅ 本地快取查詢資料
+  // ✅ 根據快取資料與表頭顯示結果
   function displayResultFromCache(carId) {
-  const result = allRecords.find(r => r.carId === carId);
-  const resultArea = document.getElementById("resultArea");
+    const idx = headers.indexOf("台車編號");
+    if (idx === -1) {
+      document.getElementById("resultArea").innerHTML = `<p class="error">❌ 查無欄位「台車編號」</p>`;
+      return;
+    }
 
-  if (!result) {
-    resultArea.innerHTML = `<p class="error">❌ 查無 ${carId} 的點檢資料</p>`;
-    document.getElementById("rescanBtn").style.display = "inline-block"; // 👈 加這行
-    return;
+    const result = allRecords.find(row => row[idx] === carId);
+    const resultArea = document.getElementById("resultArea");
+
+    if (!result) {
+      resultArea.innerHTML = `<p class="error">❌ 查無 ${carId} 的點檢資料</p>`;
+      document.getElementById("rescanBtn").style.display = "inline-block";
+      return;
+    }
+
+    resultArea.innerHTML = `<div class="info">📅 點檢日期：${result[0]}</div>`;
+
+    for (let i = 1; i < headers.length; i++) {
+      resultArea.innerHTML += `
+        <div class="card">
+          <div class="card-title">${headers[i]}</div>
+          <div class="card-content">${result[i] || "-"}</div>
+        </div>
+      `;
+    }
+
+    document.getElementById("rescanBtn").style.display = "inline-block";
   }
-
-  resultArea.innerHTML = `<div class="info">📅 點檢日期：${result.date}</div>`;
-
-  const fields = Object.entries(result).filter(([key]) => !['carId', 'date'].includes(key));
-  for (const [key, val] of fields) {
-    resultArea.innerHTML += `
-      <div class="card">
-        <div class="card-title">${key}</div>
-        <div class="card-content">${val || "-"}</div>
-      </div>
-    `;
-  }
-
-  document.getElementById("rescanBtn").style.display = "inline-block";
-}
 
   document.getElementById("rescanBtn").addEventListener("click", () => {
     document.getElementById("resultArea").innerHTML = "";
@@ -179,7 +186,7 @@
     startScanner();
   });
 
-  // ✅ 啟動：先載資料，再啟動 QR 掃描
+  // ✅ 預載資料並啟動
   preloadData();
 </script>
 
