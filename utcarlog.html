@@ -86,7 +86,7 @@
       transition: opacity 0.3s;
     }
 
-     .loading-popup {
+    .loading-popup {
       position: fixed;
       top: 0; left: 0;
       width: 100%; height: 100%;
@@ -106,11 +106,6 @@
       border-radius: 12px;
       box-shadow: 0 4px 10px rgba(0,0,0,0.3);
     }
-
-
-
-
-    
   </style>
 </head>
 <body>
@@ -125,9 +120,20 @@
   </table>
 </div>
 
+<!-- ✅ loading 視窗 -->
+<div id="loading" class="loading-popup">
+  <div class="loading-box" id="loading-text">⏳ 載入中…</div>
+</div>
+
 <script>
   const GAS_URL = "https://script.google.com/macros/s/AKfycbxBYOrRPbzVUeiZmJHvL17tPHt_lcyvr3R84Op-fY00Owq1ysr1sl-LFBvT-BfL_biTsQ/exec?mode=list";
   const GAS_URL_SAVE = "https://script.google.com/macros/s/AKfycbxBYOrRPbzVUeiZmJHvL17tPHt_lcyvr3R84Op-fY00Owq1ysr1sl-LFBvT-BfL_biTsQ/exec";
+
+  // ✅ 一開始顯示「資料載入中」
+  const loading = document.getElementById("loading");
+  const loadingText = document.getElementById("loading-text");
+  loadingText.textContent = "⏳ 資料載入中，請稍候…";
+  loading.style.display = "flex";
 
   fetch(GAS_URL)
     .then(res => res.json())
@@ -174,7 +180,6 @@
           const timestamp = row[0];  // 時間在第 0 欄
           const carId = row[1];      // 台車編號在第 1 欄
           const note = input.value;
-          const loading = document.getElementById("loading");
 
           if (!note.trim()) {
             status.textContent = "請輸入備註";
@@ -182,7 +187,8 @@
             return;
           }
 
-  // 顯示等待提示框
+          // ✅ 顯示儲存中提示
+          loadingText.textContent = "⏳ 備註儲存中，請稍候…";
           loading.style.display = "flex";
 
           fetch(GAS_URL_SAVE, {
@@ -196,12 +202,11 @@
             status.textContent = "✅ 已儲存！";
             status.style.color = "#28a745";
 
-            // ✅ 找出備註欄位（倒數第2欄）並更新內容
+            // ✅ 找出該列「備註」欄並更新文字內容
             const allTds = tr.querySelectorAll("td");
-            const noteCell = allTds[allTds.length - 2]; // 假設「備註」為倒數第2欄
+            const noteCell = allTds[allTds.length - 2]; // 倒數第2欄是「備註」
             noteCell.textContent = note;
 
-            // 清空輸入欄
             input.value = "";
             setTimeout(() => status.textContent = "", 3000);
           })
@@ -212,13 +217,15 @@
           });
         };
 
-
         tdNote.appendChild(input);
         tdNote.appendChild(btn);
         tdNote.appendChild(status);
         tr.appendChild(tdNote);
         body.appendChild(tr);
       });
+
+      // ✅ 資料載入完成後關閉提示
+      loading.style.display = "none";
 
       // 搜尋功能
       document.getElementById("search").addEventListener("input", e => {
@@ -232,13 +239,10 @@
       });
     })
     .catch(err => {
+      loading.style.display = "none";
       alert("❌ 無法載入資料：" + err.message);
     });
 </script>
-  
-<div id="loading" class="loading-popup">
-  <div class="loading-box">⏳ 備註儲存中，請稍候…</div>
-</div>
-  
+
 </body>
 </html>
