@@ -208,12 +208,13 @@
   }
 
   async function restartScanner() {
-    if (qrScanner) {
-      await qrScanner.stop();
-      clearInterval(intervalId);
-    }
-    startScan();
+  if (qrScanner) {
+    await qrScanner.stop();
+    await qrScanner.clear();
+    clearInterval(intervalId);
   }
+  await startScan();
+}
 
   document.getElementById("rescanBtn").addEventListener("click", async () => {
     document.getElementById("checkForm").style.display = "none";
