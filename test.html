@@ -52,7 +52,7 @@
       font-size: 14px;
     }
     input[type="text"] {
-      width: calc(100% - 12px); /* 調整寬度以避免溢出 */
+      width: calc(100% - 12px);
       padding: 6px;
       font-size: 14px;
       margin-top: 4px;
@@ -61,7 +61,7 @@
     }
     input[type="checkbox"] {
       margin-right: 6px;
-      vertical-align: middle; /* 讓 checkbox 和文字對齊 */
+      vertical-align: middle;
     }
     button {
       width: 100%;
@@ -96,7 +96,6 @@
       background: rgba(0, 0, 0, 0.5);
       color: white;
       font-size: 22px;
-      display: none; /* 初始隱藏 */
       justify-content: center;
       align-items: center;
       z-index: 9999;
@@ -105,7 +104,7 @@
 </head>
 <body>
 
-<h2>UT燿華台車點檢系統</h2>
+<h2>UT燿華台車點檢系統!</h2>
 <select id="cameraSelect"></select>
 <div id="reader"></div>
 <p id="carIdDisplay" class="status">📷 等待掃描 QR Code...</p>
@@ -152,9 +151,7 @@
 <script>
   const GAS_URL = "https://script.google.com/macros/s/AKfycbwwA7ZiTNgYCfpN4O5VTLTgGDoN5ZsFupcLjQKsoOMAvJu3lwkQnLDkvFypjNCKpfPh/exec";
   let scannedCarId = "";
-  // << 修改點 1: 只在全域範圍建立一次 Html5Qrcode 物件
-  const qrScanner = new Html5Qrcode("reader"); 
-  let intervalId;
+  const qrScanner = new Html5Qrcode("reader");
   let currentCameraId = null;
 
   async function initCameraOptions() {
@@ -188,68 +185,45 @@
   }
 
   async function startScan() {
-  if (!currentCameraId) return;
+    if (!currentCameraId) return;
 
-  // 新的設定，包含解析度、FPS 和對焦模式，是解決 LAG 的關鍵
-  const config = {
-    fps: 10, // 提高 FPS 讓畫面感覺更流暢
-    qrbox: 250,
-    videoConstraints: {
-      width: { ideal: 480, max: 640 },      // << 主要修改點：限制解析度
-      height: { ideal: 360, max: 480 },     // << 主要修改點：限制解析度
-      facingMode: "environment",            // 優先使用後置鏡頭
-      advanced: [{                          // << 主要修改點：使用連續對焦
-        focusMode: "continuous"
-      }]
-    }
-  };
-
-  await qrScanner.start(
-    currentCameraId,
-    config, // 套用上面的詳細設定
-    (qrCodeMessage) => {
-      // 掃描成功後的行為不變
-      scannedCarId = qrCodeMessage.trim();
-      document.getElementById("carIdDisplay").innerText = `📷 此為編號：「${scannedCarId}」的台車`;
-      if (qrScanner.isScanning) {
+    await qrScanner.start(
+      currentCameraId,
+      {
+        fps: 5,
+        aspectRatio: 1.333,
+        qrbox: { width: 200, height: 200 },
+        videoConstraints: {
+          width: { ideal: 640 },
+          height: { ideal: 480 },
+          facingMode: "environment"
+        }
+      },
+      (qrCodeMessage) => {
+        scannedCarId = qrCodeMessage.trim();
+        document.getElementById("carIdDisplay").innerText = `📷 此為編號：「${scannedCarId}」的台車`;
         qrScanner.stop();
+        document.getElementById("reader").style.display = "none";
+        document.getElementById("cameraSelect").style.display = "none";
+        document.getElementById("checkForm").style.display = "block";
+        document.getElementById("rescanBtn").style.display = "block";
+      },
+      (errorMessage) => {
+        // 可選擇忽略錯誤
       }
-      // 成功後就不需要再跑 intervalId 了，所以要清除
-      if (intervalId) {
-        clearInterval(intervalId);
-      }
-      document.getElementById("reader").style.display = "none";
-      document.getElementById("cameraSelect").style.display = "none";
-      document.getElementById("checkForm").style.display = "block";
-      document.getElementById("rescanBtn").style.display = "block";
-    },
-    (errorMessage) => {
-      // 錯誤訊息通常不用顯示給使用者
-    }
-  );
-}
-
-    // 此自動對焦的技巧可保留
-    intervalId = setInterval(() => {
-       if (qrScanner.isScanning) {
-          qrScanner.pause(true); // pause for 300ms and then resume
-          setTimeout(() => qrScanner.resume(), 300);
-       }
-    }, 5000);
+    );
   }
 
-  // << 修改點 3: 簡化 restartScanner 函式
   async function restartScanner() {
     if (qrScanner && qrScanner.isScanning) {
       await qrScanner.stop();
-      clearInterval(intervalId);
     }
     await startScan();
   }
 
   document.getElementById("rescanBtn").addEventListener("click", async () => {
     document.getElementById("checkForm").style.display = "none";
-    document.getElementById("checkForm").reset(); // 重置表單
+    document.getElementById("checkForm").reset();
     document.getElementById("result").innerText = "";
     document.getElementById("carIdDisplay").innerText = "📷 等待重新掃描 QR Code...";
     document.getElementById("rescanBtn").style.display = "none";
@@ -260,7 +234,7 @@
 
   document.getElementById("checkForm").addEventListener("submit", function(e) {
     e.preventDefault();
-    
+
     const workerIdInput = document.querySelector('input[name="workerId"]');
     if (!workerIdInput.value.trim()) {
       alert("⚠️ 請填寫點檢人員工號！");
@@ -273,7 +247,7 @@
       ["b1", "b1_ok"], ["b2", "b2_ok"], ["b3", "b3_ok"],
       ["frame", "frame_ok"]
     ];
-    
+
     const formData = new FormData(this);
     let allValid = true;
 
@@ -296,11 +270,10 @@
       carId: scannedCarId,
       workerId: formData.get("workerId")?.trim() || ""
     };
-    
-    // 將其他表單項目加入 data
+
     for (const [key, val] of formData.entries()) {
-      if(key !== "workerId") {
-         data[key] = val || "";
+      if (key !== "workerId") {
+        data[key] = val || "";
       }
     }
 
@@ -312,7 +285,6 @@
         document.getElementById("result").innerText = txt;
         this.reset();
         alert("✅ 點檢成功！");
-        // 成功後可以考慮自動觸發重新掃描
         document.getElementById("rescanBtn").click();
       })
       .catch(err => {
@@ -324,8 +296,8 @@
       });
   });
 
-  // 頁面載入後自動開始
   initCameraOptions();
 </script>
+
 </body>
 </html>
