@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
+  <meta name="apple-mobile-web-app-capable" content="yes">
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>UT台車點檢紀錄查詢（快取版）</title>
@@ -113,28 +114,28 @@
   }
 
   // ✅ 啟動 QR 掃描
-  function startScanner() {
-    const readerWrapper = document.getElementById("reader");
-    readerWrapper.innerHTML = "";
-    const newDiv = document.createElement("div");
-    newDiv.id = "reader-inner";
-    readerWrapper.appendChild(newDiv);
+ function startScanner() {
+  const readerWrapper = document.getElementById("reader");
+  readerWrapper.innerHTML = "";
+  const newDiv = document.createElement("div");
+  newDiv.id = "reader-inner";
+  readerWrapper.appendChild(newDiv);
+
+  Html5Qrcode.getCameras().then(devices => {
+    const backCam = devices.find(cam => cam.label.toLowerCase().includes("back"));
+    const camId = backCam ? backCam.id : devices[0].id;
 
     const scanner = new Html5Qrcode("reader-inner");
     scanner.start(
-      { facingMode: "environment" },
+      camId,
       {
         fps: 5,
         qrbox: 250,
-        aspectRatio: 1.777,
-        videoConstraints: {
-          width: { ideal: 640 },
-          height: { ideal: 480 }
-        }
+        aspectRatio: 1.777
       },
       qrCodeMessage => {
         scannedCarId = qrCodeMessage.trim();
-        document.getElementById("carIdDisplay").innerText = 🚚 台車編號：${scannedCarId};
+        document.getElementById("carIdDisplay").innerText = `🚚 台車編號：${scannedCarId}`;
         scanner.stop().then(() => {
           scanner.clear();
           displayResultFromCache(scannedCarId);
@@ -142,11 +143,16 @@
           document.getElementById("carIdDisplay").innerText = "❌ 停止掃描器失敗：" + err;
         });
       },
-      errorMessage => {}
+      errorMessage => {
+        // 可以忽略每幀掃描失敗的錯誤訊息
+      }
     ).catch(err => {
       document.getElementById("carIdDisplay").innerText = "❌ 攝影機啟用錯誤：" + err;
     });
-  }
+  }).catch(err => {
+    document.getElementById("carIdDisplay").innerText = "❌ 無法取得攝影機：" + err;
+  });
+}
 
   // ✅ 根據快取資料與表頭顯示結果
   function displayResultFromCache(carId) {
