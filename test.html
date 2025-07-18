@@ -188,32 +188,46 @@
   }
 
   async function startScan() {
-    if (!currentCameraId) return;
+  if (!currentCameraId) return;
 
-    // << 修改點 2: 移除在此處重複建立物件的程式碼
-    
-    await qrScanner.start(
-      currentCameraId,
-      {
-        fps: 5,
-        qrbox: 250,
-      },
-      (qrCodeMessage) => {
-        scannedCarId = qrCodeMessage.trim();
-        document.getElementById("carIdDisplay").innerText = `📷 此為編號：「${scannedCarId}」的台車`;
-        if (qrScanner.isScanning) {
-           qrScanner.stop();
-        }
-        clearInterval(intervalId);
-        document.getElementById("reader").style.display = "none";
-        document.getElementById("cameraSelect").style.display = "none";
-        document.getElementById("checkForm").style.display = "block";
-        document.getElementById("rescanBtn").style.display = "block"; // 使用 block
-      },
-      (errorMessage) => {
-        // 錯誤訊息通常不用顯示給使用者，避免干擾
+  // 新的設定，包含解析度、FPS 和對焦模式，是解決 LAG 的關鍵
+  const config = {
+    fps: 10, // 提高 FPS 讓畫面感覺更流暢
+    qrbox: 250,
+    videoConstraints: {
+      width: { ideal: 480, max: 640 },      // << 主要修改點：限制解析度
+      height: { ideal: 360, max: 480 },     // << 主要修改點：限制解析度
+      facingMode: "environment",            // 優先使用後置鏡頭
+      advanced: [{                          // << 主要修改點：使用連續對焦
+        focusMode: "continuous"
+      }]
+    }
+  };
+
+  await qrScanner.start(
+    currentCameraId,
+    config, // 套用上面的詳細設定
+    (qrCodeMessage) => {
+      // 掃描成功後的行為不變
+      scannedCarId = qrCodeMessage.trim();
+      document.getElementById("carIdDisplay").innerText = `📷 此為編號：「${scannedCarId}」的台車`;
+      if (qrScanner.isScanning) {
+        qrScanner.stop();
       }
-    );
+      // 成功後就不需要再跑 intervalId 了，所以要清除
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+      document.getElementById("reader").style.display = "none";
+      document.getElementById("cameraSelect").style.display = "none";
+      document.getElementById("checkForm").style.display = "block";
+      document.getElementById("rescanBtn").style.display = "block";
+    },
+    (errorMessage) => {
+      // 錯誤訊息通常不用顯示給使用者
+    }
+  );
+}
 
     // 此自動對焦的技巧可保留
     intervalId = setInterval(() => {
