@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>UT台車點檢紀錄查詢（快取版）</title>
+  <script src="https://unpkg.com/html5-qrcode"></script>
+  <style>
+    body {
+      font-family: "Segoe UI", "Microsoft JhengHei", sans-serif;
+      background-color: #f7f7f7;
+      padding: 20px;
+      margin: 0;
+    }
+    h2 { text-align: center; color: #333; }
+    #reader, #cameraSelect {
+      width: 100%;
+      max-width: 320px;
+      margin: 0 auto 10px;
+    }
+    .status, .info, .error {
+      text-align: center;
+      font-weight: bold;
+      margin-bottom: 10px;
+    }
+    .error { color: red; }
+    .info { font-size: 15px; color: #444; font-weight: normal; }
+    .card {
+      background-color: white;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+    .card-title {
+      font-weight: bold;
+      color: #555;
+      margin-bottom: 6px;
+    }
+    .card-content {
+      font-size: 15px;
+      color: #222;
+      word-wrap: break-word;
+    }
+    button {
+      width: 100%;
+      padding: 12px;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      font-size: 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      margin-top: 12px;
+    }
+    button:hover { background-color: #0056b3; }
+    #loadingOverlay {
+      display: flex;
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0, 0, 0, 0.4);
+      color: white;
+      font-size: 20px;
+      justify-content: center;
+      align-items: center;
+      z-index: 999;
+    }
+  </style>
+</head>
+<body>
+
+<h2>📋 UT燿華台車點檢紀錄查詢（快取版）</h2>
+<select id="cameraSelect"></select>
+<div id="reader"></div>
+<p id="carIdDisplay" class="status">📷 等待掃描 QR Code...</p>
+<div id="resultArea"></div>
+<button id="rescanBtn" style="display:none;">🔄 重新掃描</button>
+<div id="loadingOverlay">👌 資料庫載入中，等等喔，會花點時間，但可以快速查詢大量台車</div>
+
+<script>
+  const GAS_URL = "https://script.google.com/macros/s/AKfycbyqPEMYcuv3idN9icLCSgIrz7OiPbhVFDQwXcyW8j_Y1iK0FENbjEv-74CHsycONrznqA/exec";
+  let allRecords = [], headers = [], scannedCarId = "";
+  const qrScanner = new Html5Qrcode("reader");
+  let currentCameraId = null;
+
+  async function preloadData() {
+    fetch(`${GAS_URL}?mode=list`)
+      .then(res => res.json())
+      .then(data => {
+        allRecords = data.records || [];
+        headers = data.headers || [];
+        document.getElementById("loadingOverlay").style.display = "none";
+        initCameraOptions();
+      })
+      .catch(err => {
+        document.getElementById("loadingOverlay").innerText = "❌ 載入資料失敗：" + err.message;
+      });
+  }
+
+  async function initCameraOptions() {
+    try {
+      const devices = await Html5Qrcode.getCameras();
+      const cameraSelect = document.getElementById("cameraSelect");
+      cameraSelect.innerHTML = "";
+
+      if (devices.length) {
+        devices.forEach((device, index) => {
+          const option = document.createElement("option");
+          option.value = device.id;
+          option.text = device.label || `Camera ${index + 1}`;
+          cameraSelect.appendChild(option);
+        });
+
+        currentCameraId = cameraSelect.value;
+        cameraSelect.addEventListener("change", async () => {
+          currentCameraId = cameraSelect.value;
+          await restartScanner();
+        });
+
+        await startScanner();
+      } else {
+        alert("找不到攝影機！");
+      }
+    } catch (err) {
+      alert("無法取得攝影機：", err);
+    }
+  }
+
+  async function startScanner() {
+    if (!currentCameraId) return;
+
+    await qrScanner.start(
+      currentCameraId,
+      { fps: 5, qrbox: 250 },
+      (qrCodeMessage) => {
+        scannedCarId = qrCodeMessage.trim();
+        document.getElementById("carIdDisplay").innerText = `🚚 台車編號：${scannedCarId}`;
+        qrScanner.stop();
+        displayResultFromCache(scannedCarId);
+      },
+      (errorMessage) => { }
+    );
+  }
+
+  async function restartScanner() {
+    if (qrScanner && qrScanner.isScanning) {
+      await qrScanner.stop();
+    }
+    await startScanner();
+  }
+
+  function displayResultFromCache(carId) {
+    const matches = allRecords
+      .filter(r => r.carId === carId)
+      .sort((a, b) => new Date(b.time) - new Date(a.time));
+
+    const result = matches[0];
+    const resultArea = document.getElementById("resultArea");
+
+    if (!result) {
+      resultArea.innerHTML = `<p class="error">❌ 查無 ${carId} 的點檢資料</p>`;
+      document.getElementById("rescanBtn").style.display = "inline-block";
+      return;
+    }
+
+    resultArea.innerHTML = `<div class="info">📅 點檢時間：${result.time}</div>`;
+    const fields = Object.entries(result).filter(([key]) => !['carId', 'time'].includes(key));
+    for (const [key, val] of fields) {
+      resultArea.innerHTML += `
+        <div class="card">
+          <div class="card-title">${key}</div>
+          <div class="card-content">${val || "-"}</div>
+        </div>
+      `;
+    }
+
+    document.getElementById("rescanBtn").style.display = "inline-block";
+  }
+
+  document.getElementById("rescanBtn").addEventListener("click", async () => {
+    document.getElementById("resultArea").innerHTML = "";
+    document.getElementById("carIdDisplay").innerText = "📷 等待重新掃描 QR Code...";
+    document.getElementById("rescanBtn").style.display = "none";
+    await restartScanner();
+  });
+
+  preloadData();
+</script>
+
+</body>
+</html>
