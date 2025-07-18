@@ -146,7 +146,6 @@
 </form>
 
 <p id="result"></p>
-
 <div id="loadingOverlay">⌛ 提交中...請稍候</div>
 
 <script>
@@ -154,33 +153,20 @@
   let scannedCarId = "";
   let qrScanner;
   let intervalId;
-
   const cameraSelect = document.getElementById("cameraSelect");
-
-  async function populateCameraList() {
-    const devices = await Html5Qrcode.getCameras();
-    devices.forEach((device, index) => {
-      const option = document.createElement("option");
-      option.value = device.id;
-      option.text = device.label || `Camera ${index + 1}`;
-      cameraSelect.appendChild(option);
-    });
-  }
 
   async function startScanWithCamera(cameraId) {
     if (qrScanner) {
-      await qrScanner.stop().catch(()=>{});
-      qrScanner.clear();
+      try {
+        await qrScanner.stop();
+        qrScanner.clear();
+      } catch (e) { console.warn(e); }
     }
-
     qrScanner = new Html5Qrcode("reader");
+
     qrScanner.start(
       { deviceId: { exact: cameraId } },
-      {
-        fps: 5,
-        qrbox: 250,
-        aspectRatio: 1.777
-      },
+      { fps: 5, qrbox: 250, aspectRatio: 1.777 },
       qrCodeMessage => {
         scannedCarId = qrCodeMessage.trim();
         document.getElementById("carIdDisplay").innerText = `📷 此為編號：「${scannedCarId}」的台車`;
@@ -203,6 +189,7 @@
   cameraSelect.addEventListener("change", () => {
     const selectedId = cameraSelect.value;
     if (selectedId) {
+      cameraSelect.disabled = true;
       document.getElementById("carIdDisplay").innerText = "📷 等待掃描 QR Code...";
       startScanWithCamera(selectedId);
     }
@@ -270,7 +257,22 @@
       });
   });
 
-  populateCameraList();
+  async function initCameraList() {
+    try {
+      await navigator.mediaDevices.getUserMedia({ video: true });
+      const devices = await Html5Qrcode.getCameras();
+      devices.forEach((device, i) => {
+        const opt = document.createElement("option");
+        opt.value = device.id;
+        opt.text = device.label || `Camera ${i + 1}`;
+        cameraSelect.appendChild(opt);
+      });
+    } catch (e) {
+      document.getElementById("carIdDisplay").innerText = "❌ 無法取得攝影機：" + e.message;
+    }
+  }
+
+  initCameraList();
 </script>
 </body>
 </html>
