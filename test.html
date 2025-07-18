@@ -140,106 +140,108 @@
 <div id="loadingOverlay">⌛ 提交中...請稍候</div>
 
 <script>
-  const GAS_URL = "https://script.google.com/macros/s/AKfycbwwA7ZiTNgYCfpN4O5VTLTgGDoN5ZsFupcLjQKsoOMAvJu3lwkQnLDkvFypjNCKpfPh/exec";
+  const GAS_URL = "https://script.google.com/macros/s/AKfycbyqPEMYcuv3idN9icLCSgIrz7OiPbhVFDQwXcyW8j_Y1iK0FENbjEv-74CHsycONrznqA/exec";
+  let allRecords = [];
+  let headers = [];
   let scannedCarId = "";
-  let qrScanner;
-  let intervalId;
 
-  const startScan = () => {
-    qrScanner = new Html5Qrcode("reader");
-    qrScanner.start(
-      { facingMode: "environment" },
-      {
-        fps: 5,
-        qrbox: 250,
-        aspectRatio: 1.777,
-        videoConstraints: {
-          width: { ideal: 640 },
-          height: { ideal: 480 }
-        }
-      },
-      qrCodeMessage => {
-        scannedCarId = qrCodeMessage.trim();
-        document.getElementById("carIdDisplay").innerText = `📷 此為編號：「${scannedCarId}」的台車`;
-        qrScanner.stop();
-        clearInterval(intervalId);
-        document.getElementById("checkForm").style.display = "block";
-        document.getElementById("rescanBtn").style.display = "inline-block";
-      },
-      errorMessage => {}
-    ).catch(err => {
-      document.getElementById("carIdDisplay").innerText = "❌ 無法啟用攝影機：" + err;
+  // ✅ 一開始預載所有資料
+  function preloadData() {
+    fetch(`${GAS_URL}?mode=list`)
+      .then(res => res.json())
+      .then(data => {
+        allRecords = data.records || [];
+        headers = data.headers || [];
+        document.getElementById("loadingOverlay").style.display = "none";
+        startScanner();
+      })
+      .catch(err => {
+        document.getElementById("loadingOverlay").innerText = "❌ 載入資料失敗：" + err.message;
+      });
+  }
+
+  // ✅ 啟動 QR 掃描（包含後鏡頭自動選擇邏輯）
+  function startScanner() {
+    const readerWrapper = document.getElementById("reader");
+    readerWrapper.innerHTML = "";
+    const newDiv = document.createElement("div");
+    newDiv.id = "reader-inner";
+    readerWrapper.appendChild(newDiv);
+
+    const scanner = new Html5Qrcode("reader-inner");
+
+    // 嘗試列出裝置並選擇後鏡頭
+    navigator.mediaDevices.enumerateDevices().then(devices => {
+      const videoDevices = devices.filter(d => d.kind === "videoinput");
+      const backCam = videoDevices.find(d => d.label.toLowerCase().includes("back")) || videoDevices[1];
+
+      const cameraConfig = backCam
+        ? { deviceId: { exact: backCam.deviceId } }
+        : { facingMode: "environment" }; // 備用方案
+
+      scanner.start(
+        cameraConfig,
+        {
+          fps: 5,
+          qrbox: 250,
+          aspectRatio: 1.777,
+          videoConstraints: { width: { ideal: 640 }, height: { ideal: 480 } }
+        },
+        qrCodeMessage => {
+          scannedCarId = qrCodeMessage.trim();
+          document.getElementById("carIdDisplay").innerText = `🚚 台車編號：${scannedCarId}`;
+          scanner.stop().then(() => {
+            scanner.clear();
+            displayResultFromCache(scannedCarId);
+          }).catch(err => {
+            document.getElementById("carIdDisplay").innerText = "❌ 停止掃描器失敗：" + err;
+          });
+        },
+        errorMessage => {}
+      ).catch(err => {
+        document.getElementById("carIdDisplay").innerText = "❌ 攝影機啟用錯誤：" + err;
+      });
     });
+  }
 
-    intervalId = setInterval(() => {
-      qrScanner.pause();
-      setTimeout(() => qrScanner.resume(), 300);
-    }, 5000);
-  };
+  // ✅ 顯示結果
+  function displayResultFromCache(carId) {
+    const matches = allRecords
+      .filter(r => r.carId === carId)
+      .sort((a, b) => new Date(b.time) - new Date(a.time));
 
-  startScan();
+    const result = matches[0];
+    const resultArea = document.getElementById("resultArea");
 
-  document.getElementById("rescanBtn").addEventListener("click", () => {
-    document.getElementById("checkForm").style.display = "none";
-    document.getElementById("result").innerText = "";
-    document.getElementById("carIdDisplay").innerText = "📷 等待重新掃描 QR Code...";
-    document.getElementById("rescanBtn").style.display = "none";
-    qrScanner.clear();
-    startScan();
-  });
-
-  document.getElementById("checkForm").addEventListener("submit", function(e) {
-    e.preventDefault();
-    const requiredFields = [
-      "f1", "f1_ok", "f2", "f2_ok", "f3", "f3_ok",
-      "b1", "b1_ok", "b2", "b2_ok", "b3", "b3_ok",
-      "frame", "frame_ok"
-    ];
-    const formData = new FormData(this);
-    let allValid = true;
-
-    for (let i = 0; i < requiredFields.length; i += 2) {
-      const textVal = formData.get(requiredFields[i])?.trim();
-      const checkboxVal = formData.get(requiredFields[i + 1]);
-      if (!textVal && !checkboxVal) {
-        allValid = false;
-        break;
-      }
-    }
-
-    if (!allValid) {
-      alert("⚠️ 所有檢查項目都必須填寫文字或勾選無異常！");
+    if (!result) {
+      resultArea.innerHTML = `<p class="error">❌ 查無 ${carId} 的點檢資料</p>`;
+      document.getElementById("rescanBtn").style.display = "inline-block";
       return;
     }
 
-    const data = {
-      mode: "checkin_detail",
-      carId: scannedCarId,
-      workerId: formData.get("workerId")?.trim() || ""
-    };
-    formData.delete("workerId");
+    resultArea.innerHTML = `<div class="info">📅 點檢時間：${result.time}</div>`;
+    const fields = Object.entries(result).filter(([key]) => !['carId', 'time'].includes(key));
 
-    for (const [key, val] of formData.entries()) {
-      data[key] = val || "";
+    for (const [key, val] of fields) {
+      resultArea.innerHTML += `
+        <div class="card">
+          <div class="card-title">${key}</div>
+          <div class="card-content">${val || "-"}</div>
+        </div>`;
     }
 
-    // 顯示 loading
-    document.getElementById("loadingOverlay").style.display = "flex";
+    document.getElementById("rescanBtn").style.display = "inline-block";
+  }
 
-    fetch(GAS_URL + "?" + new URLSearchParams(data))
-      .then(res => res.text())
-      .then(txt => {
-        document.getElementById("result").innerText = txt;
-        this.reset();
-        alert("✅ 點檢成功！");
-      })
-      .catch(err => {
-        document.getElementById("result").innerText = "❌ 點檢失敗：" + err.message;
-      })
-      .finally(() => {
-        document.getElementById("loadingOverlay").style.display = "none";
-      });
+  document.getElementById("rescanBtn").addEventListener("click", () => {
+    document.getElementById("resultArea").innerHTML = "";
+    document.getElementById("carIdDisplay").innerText = "📷 等待重新掃描 QR Code...";
+    document.getElementById("rescanBtn").style.display = "none";
+    startScanner();
   });
+
+  // ✅ 預載資料並啟動
+  preloadData();
 </script>
 </body>
 </html>
