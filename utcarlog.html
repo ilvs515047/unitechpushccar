@@ -195,6 +195,13 @@
             loading.style.display = "none";
             status.textContent = "✅ 已儲存！";
             status.style.color = "#28a745";
+
+            // ✅ 找出備註欄位（倒數第2欄）並更新內容
+            const allTds = tr.querySelectorAll("td");
+            const noteCell = allTds[allTds.length - 2]; // 假設「備註」為倒數第2欄
+            noteCell.textContent = note;
+
+            // 清空輸入欄
             input.value = "";
             setTimeout(() => status.textContent = "", 3000);
           })
