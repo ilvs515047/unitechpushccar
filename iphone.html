@@ -19,7 +19,15 @@
     #reader {
       width: 100%;
       max-width: 320px;
-      margin: 0 auto 20px;
+      margin: 0 auto 10px;
+    }
+    #cameraSelect {
+      display: block;
+      margin: 0 auto 10px;
+      padding: 6px;
+      font-size: 14px;
+      width: 100%;
+      max-width: 320px;
     }
     .status {
       text-align: center;
@@ -96,6 +104,7 @@
 <body>
 
 <h2>UT燿華台車點檢系統</h2>
+<select id="cameraSelect"></select>
 <div id="reader"></div>
 <p id="carIdDisplay" class="status">📷 等待掃描 QR Code...</p>
 <button id="rescanBtn" style="display:none;">🔄 重新掃描</button>
@@ -136,7 +145,6 @@
 </form>
 
 <p id="result"></p>
-
 <div id="loadingOverlay">⌛ 提交中...請稍候</div>
 
 <script>
@@ -144,70 +152,76 @@
   let scannedCarId = "";
   let qrScanner;
   let intervalId;
+  let currentCameraId = null;
 
-  const startScan = async () => {
-  try {
+  async function initCameraOptions() {
     const devices = await Html5Qrcode.getCameras();
+    const cameraSelect = document.getElementById("cameraSelect");
+    cameraSelect.innerHTML = "";
 
-    if (devices && devices.length > 1) {
-      // 嘗試使用第2個攝影機（通常是後鏡頭）
-      const cameraId = devices[1].id;
-      qrScanner = new Html5Qrcode("reader");
+    devices.forEach((device, index) => {
+      const option = document.createElement("option");
+      option.value = device.id;
+      option.text = device.label || `Camera ${index + 1}`;
+      cameraSelect.appendChild(option);
+    });
 
-      await qrScanner.start(
-        cameraId,
-        {
-          fps: 5,
-          qrbox: 250,
-          aspectRatio: 1.777,
-          videoConstraints: {
-            width: { ideal: 640 },
-            height: { ideal: 480 }
-          }
-        },
-        qrCodeMessage => {
-          scannedCarId = qrCodeMessage.trim();
-          document.getElementById("carIdDisplay").innerText = `📷 此為編號：「${scannedCarId}」的台車`;
-          qrScanner.stop();
-          clearInterval(intervalId);
-          document.getElementById("checkForm").style.display = "block";
-          document.getElementById("rescanBtn").style.display = "inline-block";
-        },
-        errorMessage => {
-          // 可忽略錯誤或 console.log(errorMessage)
+    currentCameraId = cameraSelect.value;
+    cameraSelect.addEventListener("change", async () => {
+      currentCameraId = cameraSelect.value;
+      await restartScanner();
+    });
+
+    startScan();
+  }
+
+  async function startScan() {
+    if (!currentCameraId) return;
+    qrScanner = new Html5Qrcode("reader");
+
+    await qrScanner.start(
+      currentCameraId,
+      {
+        fps: 5,
+        qrbox: 250,
+        aspectRatio: 1.777,
+        videoConstraints: {
+          width: { ideal: 640 },
+          height: { ideal: 480 }
         }
-      );
+      },
+      qrCodeMessage => {
+        scannedCarId = qrCodeMessage.trim();
+        document.getElementById("carIdDisplay").innerText = `📷 此為編號：「${scannedCarId}」的台車`;
+        qrScanner.stop();
+        clearInterval(intervalId);
+        document.getElementById("checkForm").style.display = "block";
+        document.getElementById("rescanBtn").style.display = "inline-block";
+      },
+      errorMessage => {}
+    );
 
-      intervalId = setInterval(() => {
-        qrScanner.pause();
-        setTimeout(() => qrScanner.resume(), 300);
-      }, 5000);
+    intervalId = setInterval(() => {
+      qrScanner.pause();
+      setTimeout(() => qrScanner.resume(), 300);
+    }, 5000);
+  }
 
-    } else {
-      document.getElementById("carIdDisplay").innerText = "❌ 沒有可用攝影機，或裝置不支援後鏡頭選擇";
+  async function restartScanner() {
+    if (qrScanner) {
+      await qrScanner.stop();
+      clearInterval(intervalId);
     }
-  } catch (err) {
-    document.getElementById("carIdDisplay").innerText = "❌ 攝影機錯誤：" + err;
-  }
-};
-
-// ✅ 初次啟動
-startScan();
-
-// ✅ 重新掃描按鈕邏輯
-document.getElementById("rescanBtn").addEventListener("click", async () => {
-  document.getElementById("checkForm").style.display = "none";
-  document.getElementById("result").innerText = "";
-  document.getElementById("carIdDisplay").innerText = "📷 等待重新掃描 QR Code...";
-  document.getElementById("rescanBtn").style.display = "none";
-
-  if (qrScanner) {
-    await qrScanner.clear(); // 等待清除後再重新啟動
+    startScan();
   }
 
-  startScan();
-});
-
+  document.getElementById("rescanBtn").addEventListener("click", async () => {
+    document.getElementById("checkForm").style.display = "none";
+    document.getElementById("result").innerText = "";
+    document.getElementById("carIdDisplay").innerText = "📷 等待重新掃描 QR Code...";
+    document.getElementById("rescanBtn").style.display = "none";
+    await restartScanner();
+  });
 
   document.getElementById("checkForm").addEventListener("submit", function(e) {
     e.preventDefault();
@@ -244,7 +258,6 @@ document.getElementById("rescanBtn").addEventListener("click", async () => {
       data[key] = val || "";
     }
 
-    // 顯示 loading
     document.getElementById("loadingOverlay").style.display = "flex";
 
     fetch(GAS_URL + "?" + new URLSearchParams(data))
@@ -261,6 +274,8 @@ document.getElementById("rescanBtn").addEventListener("click", async () => {
         document.getElementById("loadingOverlay").style.display = "none";
       });
   });
+
+  initCameraOptions();
 </script>
 </body>
 </html>
