@@ -45,7 +45,6 @@
     .container {
       overflow-x: auto;
     }
-
     input.note-input {
       width: 70%;
       padding: 6px 10px;
@@ -55,12 +54,10 @@
       transition: 0.2s;
       box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
     }
-
     input.note-input:focus {
       border-color: #66afe9;
       box-shadow: 0 0 5px rgba(102,175,233,0.6);
     }
-
     button.note-save {
       margin-left: 6px;
       padding: 6px 12px;
@@ -72,11 +69,9 @@
       cursor: pointer;
       transition: 0.2s;
     }
-
     button.note-save:hover {
       background-color: #ff9800;
     }
-
     .save-status {
       display: inline-block;
       margin-left: 8px;
@@ -85,7 +80,6 @@
       font-weight: bold;
       transition: opacity 0.3s;
     }
-
     .loading-popup {
       position: fixed;
       top: 0; left: 0;
@@ -120,7 +114,6 @@
   </table>
 </div>
 
-<!-- ✅ loading 視窗 -->
 <div id="loading" class="loading-popup">
   <div class="loading-box" id="loading-text">⏳ 載入中…</div>
 </div>
@@ -129,9 +122,6 @@
   const GAS_URL = "https://script.google.com/macros/s/AKfycbxBYOrRPbzVUeiZmJHvL17tPHt_lcyvr3R84Op-fY00Owq1ysr1sl-LFBvT-BfL_biTsQ/exec?mode=list";
   const GAS_URL_SAVE = "https://script.google.com/macros/s/AKfycbxBYOrRPbzVUeiZmJHvL17tPHt_lcyvr3R84Op-fY00Owq1ysr1sl-LFBvT-BfL_biTsQ/exec";
 
-  const visibleIndexes = [0, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27]; // A欄與S~AB欄
-
-  // ✅ 一開始顯示「資料載入中」
   const loading = document.getElementById("loading");
   const loadingText = document.getElementById("loading-text");
   loadingText.textContent = "⏳ 資料載入中，請稍候…";
@@ -143,7 +133,9 @@
       const head = document.getElementById("tableHead");
       const body = document.getElementById("tableBody");
 
-      // ✅ 表頭：只顯示 visibleIndexes 對應欄位
+      // ✅ 正確索引：A欄(0) + S~AB(18~27)
+      const visibleIndexes = [0, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27];
+
       visibleIndexes.forEach(i => {
         const th = document.createElement("th");
         th.textContent = data.headers[i] || `欄位${i + 1}`;
@@ -154,7 +146,6 @@
       thNote.textContent = "新增備註";
       head.appendChild(thNote);
 
-      // ✅ 每筆資料列
       data.records.forEach(row => {
         const tr = document.createElement("tr");
 
@@ -164,7 +155,6 @@
           tr.appendChild(td);
         });
 
-        // ✅ 備註輸入與儲存按鈕
         const tdNote = document.createElement("td");
         const input = document.createElement("input");
         input.type = "text";
@@ -180,9 +170,8 @@
         status.textContent = "";
 
         btn.onclick = () => {
-          const timestamp = row[0];  // A欄為 timestamp
-          const carId = row[1];      // B欄為台車編號（雖然沒顯示，但 GAS 仍會有）
-
+          const timestamp = row[0]; // A欄
+          const carId = row[1];     // B欄（雖然沒顯示，但仍存在）
           const note = input.value;
 
           if (!note.trim()) {
@@ -205,7 +194,6 @@
             status.textContent = "✅ 已儲存！";
             status.style.color = "#28a745";
 
-            // ✅ 找出該列「備註」欄（倒數第2欄）並更新
             const allTds = tr.querySelectorAll("td");
             const noteCell = allTds[allTds.length - 2];
             noteCell.textContent = note;
@@ -227,10 +215,8 @@
         body.appendChild(tr);
       });
 
-      // ✅ 資料載入完成後關閉提示
       loading.style.display = "none";
 
-      // ✅ 搜尋功能：仍檢查整列文字
       document.getElementById("search").addEventListener("input", e => {
         const keyword = e.target.value.trim().toLowerCase();
         Array.from(body.rows).forEach(row => {
@@ -246,7 +232,6 @@
       alert("❌ 無法載入資料：" + err.message);
     });
 </script>
-
 
 </body>
 </html>
