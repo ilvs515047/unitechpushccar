@@ -163,51 +163,54 @@
   }
 
   function startScanner() {
-    if (qrScanner) {
-      qrScanner.clear();
-    }
+  const readerContainer = document.getElementById("reader");
+  readerContainer.innerHTML = ""; // 🔧 關鍵：重建 scanner DOM
+  const newDiv = document.createElement("div");
+  newDiv.id = "reader-inner";
+  readerContainer.appendChild(newDiv);
 
-    qrScanner = new Html5Qrcode("reader");
-    qrScanner.start(
-      { deviceId: { exact: currentCameraId } },
-      {
-        fps: 5,
-        qrbox: 250,
-        aspectRatio: 1.777,
-        videoConstraints: {
-          width: { ideal: 640 },
-          height: { ideal: 480 }
-        }
-      },
-      (qrCodeMessage) => {
-        scannedCarId = qrCodeMessage.trim();
-        document.getElementById("carIdDisplay").innerText = `📷 此為編號：「${scannedCarId}」的台車`;
-        qrScanner.stop();
-        clearInterval(intervalId);
-        document.getElementById("reader").style.display = "none";
-        document.getElementById("cameraSelect").style.display = "none";
-        document.getElementById("checkForm").style.display = "block";
-        document.getElementById("rescanBtn").style.display = "block";
-      },
-      (errorMessage) => {}
-    ).catch(err => {
-      document.getElementById("carIdDisplay").innerText = "❌ 攝影機啟用錯誤：" + err;
-    });
+  qrScanner = new Html5Qrcode("reader-inner");
+  qrScanner.start(
+    { deviceId: { exact: currentCameraId } },
+    {
+      fps: 5,
+      qrbox: 250,
+      aspectRatio: 1.777,
+      videoConstraints: {
+        width: { ideal: 640 },
+        height: { ideal: 480 }
+      }
+    },
+    (qrCodeMessage) => {
+      scannedCarId = qrCodeMessage.trim();
+      document.getElementById("carIdDisplay").innerText = `📷 此為編號：「${scannedCarId}」的台車`;
+      qrScanner.stop();
+      clearInterval(intervalId);
+      document.getElementById("reader").style.display = "none";
+      document.getElementById("cameraSelect").style.display = "none";
+      document.getElementById("checkForm").style.display = "block";
+      document.getElementById("rescanBtn").style.display = "block";
+    },
+    () => {} // 忽略錯誤
+  ).catch(err => {
+    document.getElementById("carIdDisplay").innerText = "❌ 攝影機啟用錯誤：" + err;
+  });
 
-    intervalId = setInterval(() => {
-      qrScanner.pause();
-      setTimeout(() => qrScanner.resume(), 300);
-    }, 5000);
-  }
+  intervalId = setInterval(() => {
+    qrScanner.pause();
+    setTimeout(() => qrScanner.resume(), 300);
+  }, 5000);
+}
 
   function restartScanner() {
-    if (qrScanner) {
-      qrScanner.stop().then(() => {
-        qrScanner.clear();
-        startScanner();
-      });
-    }
+  if (qrScanner) {
+    qrScanner.stop().then(() => {
+      qrScanner.clear();
+      document.getElementById("reader").innerHTML = ""; // 🔧 關鍵：清空 scanner 容器
+      startScanner();
+    });
   }
+}
 
   document.getElementById("rescanBtn").addEventListener("click", () => {
     document.getElementById("checkForm").style.display = "none";
