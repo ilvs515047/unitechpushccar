@@ -120,7 +120,6 @@
   </table>
 </div>
 
-<!-- ✅ loading 視窗 -->
 <div id="loading" class="loading-popup">
   <div class="loading-box" id="loading-text">⏳ 載入中…</div>
 </div>
@@ -129,11 +128,12 @@
   const GAS_URL = "https://script.google.com/macros/s/AKfycbxBYOrRPbzVUeiZmJHvL17tPHt_lcyvr3R84Op-fY00Owq1ysr1sl-LFBvT-BfL_biTsQ/exec?mode=list";
   const GAS_URL_SAVE = "https://script.google.com/macros/s/AKfycbxBYOrRPbzVUeiZmJHvL17tPHt_lcyvr3R84Op-fY00Owq1ysr1sl-LFBvT-BfL_biTsQ/exec";
 
-  // ✅ 一開始顯示「資料載入中」
   const loading = document.getElementById("loading");
   const loadingText = document.getElementById("loading-text");
   loadingText.textContent = "⏳ 資料載入中，請稍候…";
   loading.style.display = "flex";
+
+  const hiddenColumnIndexes = [2, 3]; // 第 3 與第 4 欄隱藏（從 0 起算）
 
   fetch(GAS_URL)
     .then(res => res.json())
@@ -141,8 +141,8 @@
       const head = document.getElementById("tableHead");
       const body = document.getElementById("tableBody");
 
-      // 表頭
-      data.headers.forEach(h => {
+      data.headers.forEach((h, i) => {
+        if (hiddenColumnIndexes.includes(i)) return;
         const th = document.createElement("th");
         th.textContent = h;
         head.appendChild(th);
@@ -151,17 +151,16 @@
       thNote.textContent = "新增備註";
       head.appendChild(thNote);
 
-      // 每筆資料列
       data.records.forEach(row => {
         const tr = document.createElement("tr");
 
-        row.forEach(cell => {
+        row.forEach((cell, i) => {
+          if (hiddenColumnIndexes.includes(i)) return;
           const td = document.createElement("td");
           td.textContent = cell || "-";
           tr.appendChild(td);
         });
 
-        // 備註輸入與儲存按鈕
         const tdNote = document.createElement("td");
         const input = document.createElement("input");
         input.type = "text";
@@ -177,8 +176,8 @@
         status.textContent = "";
 
         btn.onclick = () => {
-          const timestamp = row[0];  // 時間在第 0 欄
-          const carId = row[1];      // 台車編號在第 1 欄
+          const timestamp = row[0];
+          const carId = row[1];
           const note = input.value;
 
           if (!note.trim()) {
@@ -187,14 +186,13 @@
             return;
           }
 
-          // ✅ 顯示儲存中提示
           loadingText.textContent = "⏳ 備註儲存中，請稍候…";
           loading.style.display = "flex";
 
           fetch(GAS_URL_SAVE, {
             method: "POST",
             headers: { "Content-Type": "application/x-www-form-urlencoded" },
-            body: mode=note&carId=${encodeURIComponent(carId)}&timestamp=${encodeURIComponent(timestamp)}&note=${encodeURIComponent(note)}
+            body: `mode=note&carId=${encodeURIComponent(carId)}&timestamp=${encodeURIComponent(timestamp)}&note=${encodeURIComponent(note)}`
           })
           .then(res => res.text())
           .then(msg => {
@@ -202,9 +200,8 @@
             status.textContent = "✅ 已儲存！";
             status.style.color = "#28a745";
 
-            // ✅ 找出該列「備註」欄並更新文字內容
             const allTds = tr.querySelectorAll("td");
-            const noteCell = allTds[allTds.length - 2]; // 倒數第2欄是「備註」
+            const noteCell = allTds[allTds.length - 2];
             noteCell.textContent = note;
 
             input.value = "";
@@ -224,10 +221,8 @@
         body.appendChild(tr);
       });
 
-      // ✅ 資料載入完成後關閉提示
       loading.style.display = "none";
 
-      // 搜尋功能
       document.getElementById("search").addEventListener("input", e => {
         const keyword = e.target.value.trim().toLowerCase();
         Array.from(body.rows).forEach(row => {
