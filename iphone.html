@@ -150,7 +150,7 @@
 <script>
   const GAS_URL = "https://script.google.com/macros/s/AKfycbwwA7ZiTNgYCfpN4O5VTLTgGDoN5ZsFupcLjQKsoOMAvJu3lwkQnLDkvFypjNCKpfPh/exec";
   let scannedCarId = "";
-  let qrScanner;
+  const qrScanner = new Html5Qrcode("reader"); // << 只在這裡建立一次物件
   let intervalId;
   let currentCameraId = null;
 
@@ -177,7 +177,7 @@
 
   async function startScan() {
     if (!currentCameraId) return;
-    qrScanner = new Html5Qrcode("reader");
+
 
     await qrScanner.start(
       currentCameraId,
