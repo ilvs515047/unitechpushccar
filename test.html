@@ -12,11 +12,22 @@
       padding: 20px;
       margin: 0;
     }
-    h2 { text-align: center; color: #333; }
-    #reader, #cameraSelect {
+    h2 {
+      text-align: center;
+      color: #333;
+    }
+    #reader {
       width: 100%;
       max-width: 320px;
       margin: 0 auto 10px;
+    }
+    #cameraSelect {
+      display: block;
+      margin: 0 auto 10px;
+      padding: 6px;
+      font-size: 14px;
+      width: 100%;
+      max-width: 320px;
     }
     .status {
       text-align: center;
@@ -41,7 +52,7 @@
       font-size: 14px;
     }
     input[type="text"] {
-      width: calc(100% - 12px);
+      width: calc(100% - 12px); /* 調整寬度以避免溢出 */
       padding: 6px;
       font-size: 14px;
       margin-top: 4px;
@@ -50,7 +61,7 @@
     }
     input[type="checkbox"] {
       margin-right: 6px;
-      vertical-align: middle;
+      vertical-align: middle; /* 讓 checkbox 和文字對齊 */
     }
     button {
       width: 100%;
@@ -62,12 +73,16 @@
       border-radius: 8px;
       cursor: pointer;
     }
-    button:hover { background-color: #218838; }
+    button:hover {
+      background-color: #218838;
+    }
     #rescanBtn {
       margin-top: 10px;
       background-color: #007bff;
     }
-    #rescanBtn:hover { background-color: #0056b3; }
+    #rescanBtn:hover {
+      background-color: #0056b3;
+    }
     #result {
       text-align: center;
       margin-top: 20px;
@@ -81,6 +96,7 @@
       background: rgba(0, 0, 0, 0.5);
       color: white;
       font-size: 22px;
+      display: none; /* 初始隱藏 */
       justify-content: center;
       align-items: center;
       z-index: 9999;
@@ -100,6 +116,7 @@
     <div class="card-title">👷‍♂️ 點檢人員工號</div>
     <label><input type="text" name="workerId" required></label>
   </div>
+
   <div class="card">
     <div class="card-title">🔧 前輪（轉向輪）</div>
     <label>1. 焊接狀況描述 <input type="text" name="f1"></label>
@@ -109,6 +126,7 @@
     <label>3. 車輪/煞車描述 <input type="text" name="f3"></label>
     <label><input type="checkbox" name="f3_ok"> 無異常</label>
   </div>
+
   <div class="card">
     <div class="card-title">🔧 後輪（手把端）</div>
     <label>1. 焊接狀況描述 <input type="text" name="b1"></label>
@@ -118,11 +136,13 @@
     <label>3. 車輪/煞車描述 <input type="text" name="b3"></label>
     <label><input type="checkbox" name="b3_ok"> 無異常</label>
   </div>
+
   <div class="card">
     <div class="card-title">🔧 車架/骨架接縫處</div>
     <label>描述狀況 <input type="text" name="frame"></label>
     <label><input type="checkbox" name="frame_ok"> 無異常</label>
   </div>
+
   <button type="submit">✅ 提交點檢</button>
 </form>
 
@@ -132,103 +152,105 @@
 <script>
   const GAS_URL = "https://script.google.com/macros/s/AKfycbwwA7ZiTNgYCfpN4O5VTLTgGDoN5ZsFupcLjQKsoOMAvJu3lwkQnLDkvFypjNCKpfPh/exec";
   let scannedCarId = "";
-  let qrScanner = null;
-  let intervalId = null;
+  // << 修改點 1: 只在全域範圍建立一次 Html5Qrcode 物件
+  const qrScanner = new Html5Qrcode("reader"); 
+  let intervalId;
   let currentCameraId = null;
 
   async function initCameraOptions() {
-    const devices = await Html5Qrcode.getCameras();
-    const select = document.getElementById("cameraSelect");
-    select.innerHTML = "";
+    try {
+      const devices = await Html5Qrcode.getCameras();
+      const cameraSelect = document.getElementById("cameraSelect");
+      cameraSelect.innerHTML = "";
 
-    if (devices.length === 0) {
-      alert("找不到攝影機！");
-      return;
-    }
+      if (devices && devices.length) {
+        devices.forEach((device, index) => {
+          const option = document.createElement("option");
+          option.value = device.id;
+          option.text = device.label || `Camera ${index + 1}`;
+          cameraSelect.appendChild(option);
+        });
 
-    devices.forEach((device, idx) => {
-      const option = document.createElement("option");
-      option.value = device.id;
-      option.text = device.label || `Camera ${idx + 1}`;
-      select.appendChild(option);
-    });
+        currentCameraId = cameraSelect.value;
+        cameraSelect.addEventListener("change", async () => {
+          currentCameraId = cameraSelect.value;
+          await restartScanner();
+        });
 
-    currentCameraId = select.value;
-    select.addEventListener("change", () => {
-      currentCameraId = select.value;
-      restartScanner();
-    });
-
-    startScanner();
-  }
-
-  function startScanner() {
-  const readerContainer = document.getElementById("reader");
-  readerContainer.innerHTML = ""; // 🔧 關鍵：重建 scanner DOM
-  const newDiv = document.createElement("div");
-  newDiv.id = "reader-inner";
-  readerContainer.appendChild(newDiv);
-
-  qrScanner = new Html5Qrcode("reader-inner");
-  qrScanner.start(
-    { deviceId: { exact: currentCameraId } },
-    {
-      fps: 5,
-      qrbox: 250,
-      aspectRatio: 1.777,
-      videoConstraints: {
-        width: { ideal: 640 },
-        height: { ideal: 480 }
+        await startScan();
+      } else {
+        alert("找不到攝影機設備！");
       }
-    },
-    (qrCodeMessage) => {
-      scannedCarId = qrCodeMessage.trim();
-      document.getElementById("carIdDisplay").innerText = `📷 此為編號：「${scannedCarId}」的台車`;
-      qrScanner.stop();
-      clearInterval(intervalId);
-      document.getElementById("reader").style.display = "none";
-      document.getElementById("cameraSelect").style.display = "none";
-      document.getElementById("checkForm").style.display = "block";
-      document.getElementById("rescanBtn").style.display = "block";
-    },
-    () => {} // 忽略錯誤
-  ).catch(err => {
-    document.getElementById("carIdDisplay").innerText = "❌ 攝影機啟用錯誤：" + err;
-  });
-
-  intervalId = setInterval(() => {
-    qrScanner.pause();
-    setTimeout(() => qrScanner.resume(), 300);
-  }, 5000);
-}
-
-  function restartScanner() {
-  if (qrScanner) {
-    qrScanner.stop().then(() => {
-      qrScanner.clear();
-      document.getElementById("reader").innerHTML = ""; // 🔧 關鍵：清空 scanner 容器
-      startScanner();
-    });
+    } catch (err) {
+      console.error("初始化攝影機失敗:", err);
+      alert("無法存取攝影機，請檢查瀏覽器權限。");
+    }
   }
-}
 
-  document.getElementById("rescanBtn").addEventListener("click", () => {
+  async function startScan() {
+    if (!currentCameraId) return;
+
+    // << 修改點 2: 移除在此處重複建立物件的程式碼
+    
+    await qrScanner.start(
+      currentCameraId,
+      {
+        fps: 5,
+        qrbox: 250,
+      },
+      (qrCodeMessage) => {
+        scannedCarId = qrCodeMessage.trim();
+        document.getElementById("carIdDisplay").innerText = `📷 此為編號：「${scannedCarId}」的台車`;
+        if (qrScanner.isScanning) {
+           qrScanner.stop();
+        }
+        clearInterval(intervalId);
+        document.getElementById("reader").style.display = "none";
+        document.getElementById("cameraSelect").style.display = "none";
+        document.getElementById("checkForm").style.display = "block";
+        document.getElementById("rescanBtn").style.display = "block"; // 使用 block
+      },
+      (errorMessage) => {
+        // 錯誤訊息通常不用顯示給使用者，避免干擾
+      }
+    );
+
+    // 此自動對焦的技巧可保留
+    intervalId = setInterval(() => {
+       if (qrScanner.isScanning) {
+          qrScanner.pause(true); // pause for 300ms and then resume
+          setTimeout(() => qrScanner.resume(), 300);
+       }
+    }, 5000);
+  }
+
+  // << 修改點 3: 簡化 restartScanner 函式
+  async function restartScanner() {
+    if (qrScanner && qrScanner.isScanning) {
+      await qrScanner.stop();
+      clearInterval(intervalId);
+    }
+    await startScan();
+  }
+
+  document.getElementById("rescanBtn").addEventListener("click", async () => {
     document.getElementById("checkForm").style.display = "none";
-    document.getElementById("checkForm").reset();
+    document.getElementById("checkForm").reset(); // 重置表單
     document.getElementById("result").innerText = "";
     document.getElementById("carIdDisplay").innerText = "📷 等待重新掃描 QR Code...";
     document.getElementById("rescanBtn").style.display = "none";
     document.getElementById("reader").style.display = "block";
     document.getElementById("cameraSelect").style.display = "block";
-    restartScanner();
+    await restartScanner();
   });
 
   document.getElementById("checkForm").addEventListener("submit", function(e) {
     e.preventDefault();
-    const formData = new FormData(this);
-    const workerId = formData.get("workerId")?.trim();
-    if (!workerId) {
+    
+    const workerIdInput = document.querySelector('input[name="workerId"]');
+    if (!workerIdInput.value.trim()) {
       alert("⚠️ 請填寫點檢人員工號！");
+      workerIdInput.focus();
       return;
     }
 
@@ -237,6 +259,8 @@
       ["b1", "b1_ok"], ["b2", "b2_ok"], ["b3", "b3_ok"],
       ["frame", "frame_ok"]
     ];
+    
+    const formData = new FormData(this);
     let allValid = true;
 
     for (const [textName, checkName] of requiredPairs) {
@@ -253,9 +277,17 @@
       return;
     }
 
-    const data = { mode: "checkin_detail", carId: scannedCarId, workerId };
+    const data = {
+      mode: "checkin_detail",
+      carId: scannedCarId,
+      workerId: formData.get("workerId")?.trim() || ""
+    };
+    
+    // 將其他表單項目加入 data
     for (const [key, val] of formData.entries()) {
-      if (key !== "workerId") data[key] = val || "";
+      if(key !== "workerId") {
+         data[key] = val || "";
+      }
     }
 
     document.getElementById("loadingOverlay").style.display = "flex";
@@ -266,6 +298,7 @@
         document.getElementById("result").innerText = txt;
         this.reset();
         alert("✅ 點檢成功！");
+        // 成功後可以考慮自動觸發重新掃描
         document.getElementById("rescanBtn").click();
       })
       .catch(err => {
@@ -277,6 +310,7 @@
       });
   });
 
+  // 頁面載入後自動開始
   initCameraOptions();
 </script>
 </body>
