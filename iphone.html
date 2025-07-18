@@ -91,14 +91,21 @@
       align-items: center;
       z-index: 9999;
     }
+    #cameraSelect {
+      display: block;
+      margin: 10px auto;
+      padding: 8px;
+      font-size: 16px;
+      max-width: 320px;
+    }
   </style>
 </head>
 <body>
 
-<h2>UT燿華台車點檢系統.</h2>
-<label for="cameraSelect">📷 選擇攝影機：</label>
-<select id="cameraSelect" style="width: 100%; padding: 8px; margin-bottom: 16px;"></select>
-
+<h2>UT燿華台車點檢系統</h2>
+<select id="cameraSelect">
+  <option value="">🔍 請選擇攝影機</option>
+</select>
 <div id="reader"></div>
 <p id="carIdDisplay" class="status">📷 等待掃描 QR Code...</p>
 <button id="rescanBtn" style="display:none;">🔄 重新掃描</button>
@@ -148,49 +155,31 @@
   let qrScanner;
   let intervalId;
 
-  // ✅ 初始化攝影機選單
-  function initCameraOptions() {
-    Html5Qrcode.getCameras().then(devices => {
-      const select = document.getElementById("cameraSelect");
-      select.innerHTML = "";
+  const cameraSelect = document.getElementById("cameraSelect");
 
-      devices.forEach(device => {
-        const option = document.createElement("option");
-        option.value = device.id;
-        option.text = device.label || `Camera ${select.length + 1}`;
-        select.appendChild(option);
-      });
-
-      // 自動選擇已記憶的鏡頭，或預設第一個
-      const savedDeviceId = localStorage.getItem("selectedCameraId");
-      const defaultId = savedDeviceId && devices.some(d => d.id === savedDeviceId)
-        ? savedDeviceId
-        : devices[0]?.id;
-
-      select.value = defaultId;
-      startScan(defaultId);
-    }).catch(err => {
-      document.getElementById("carIdDisplay").innerText = "❌ 無法讀取攝影機：" + err;
+  async function populateCameraList() {
+    const devices = await Html5Qrcode.getCameras();
+    devices.forEach((device, index) => {
+      const option = document.createElement("option");
+      option.value = device.id;
+      option.text = device.label || `Camera ${index + 1}`;
+      cameraSelect.appendChild(option);
     });
   }
 
-  // ✅ 啟動 QR 掃描
-  function startScan(deviceId) {
+  async function startScanWithCamera(cameraId) {
     if (qrScanner) {
+      await qrScanner.stop().catch(()=>{});
       qrScanner.clear();
     }
 
     qrScanner = new Html5Qrcode("reader");
     qrScanner.start(
-      { deviceId: { exact: deviceId } },
+      { deviceId: { exact: cameraId } },
       {
         fps: 5,
         qrbox: 250,
-        aspectRatio: 1.777,
-        videoConstraints: {
-          width: { ideal: 640 },
-          height: { ideal: 480 }
-        }
+        aspectRatio: 1.777
       },
       qrCodeMessage => {
         scannedCarId = qrCodeMessage.trim();
@@ -211,31 +200,77 @@
     }, 5000);
   }
 
-  // ✅ 選單事件：切換攝影機
-  document.getElementById("cameraSelect").addEventListener("change", () => {
-    const selectedId = document.getElementById("cameraSelect").value;
-    localStorage.setItem("selectedCameraId", selectedId);
-    if (qrScanner) {
-      qrScanner.stop().then(() => {
-        qrScanner.clear();
-        startScan(selectedId);
-      });
+  cameraSelect.addEventListener("change", () => {
+    const selectedId = cameraSelect.value;
+    if (selectedId) {
+      document.getElementById("carIdDisplay").innerText = "📷 等待掃描 QR Code...";
+      startScanWithCamera(selectedId);
     }
   });
 
-  // ✅ 重掃按鈕
   document.getElementById("rescanBtn").addEventListener("click", () => {
     document.getElementById("checkForm").style.display = "none";
     document.getElementById("result").innerText = "";
     document.getElementById("carIdDisplay").innerText = "📷 等待重新掃描 QR Code...";
     document.getElementById("rescanBtn").style.display = "none";
-    qrScanner.clear();
-    const selectedId = document.getElementById("cameraSelect").value;
-    startScan(selectedId);
+    cameraSelect.disabled = false;
+    const selectedId = cameraSelect.value;
+    if (selectedId) startScanWithCamera(selectedId);
   });
 
-  // ✅ 初始化
-  initCameraOptions();
+  document.getElementById("checkForm").addEventListener("submit", function(e) {
+    e.preventDefault();
+    const requiredFields = [
+      "f1", "f1_ok", "f2", "f2_ok", "f3", "f3_ok",
+      "b1", "b1_ok", "b2", "b2_ok", "b3", "b3_ok",
+      "frame", "frame_ok"
+    ];
+    const formData = new FormData(this);
+    let allValid = true;
+
+    for (let i = 0; i < requiredFields.length; i += 2) {
+      const textVal = formData.get(requiredFields[i])?.trim();
+      const checkboxVal = formData.get(requiredFields[i + 1]);
+      if (!textVal && !checkboxVal) {
+        allValid = false;
+        break;
+      }
+    }
+
+    if (!allValid) {
+      alert("⚠️ 所有檢查項目都必須填寫文字或勾選無異常！");
+      return;
+    }
+
+    const data = {
+      mode: "checkin_detail",
+      carId: scannedCarId,
+      workerId: formData.get("workerId")?.trim() || ""
+    };
+    formData.delete("workerId");
+
+    for (const [key, val] of formData.entries()) {
+      data[key] = val || "";
+    }
+
+    document.getElementById("loadingOverlay").style.display = "flex";
+
+    fetch(GAS_URL + "?" + new URLSearchParams(data))
+      .then(res => res.text())
+      .then(txt => {
+        document.getElementById("result").innerText = txt;
+        this.reset();
+        alert("✅ 點檢成功！");
+      })
+      .catch(err => {
+        document.getElementById("result").innerText = "❌ 點檢失敗：" + err.message;
+      })
+      .finally(() => {
+        document.getElementById("loadingOverlay").style.display = "none";
+      });
+  });
+
+  populateCameraList();
 </script>
 </body>
 </html>
