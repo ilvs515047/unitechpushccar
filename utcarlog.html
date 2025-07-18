@@ -45,7 +45,6 @@
     .container {
       overflow-x: auto;
     }
-
     input.note-input {
       width: 70%;
       padding: 6px 10px;
@@ -55,12 +54,10 @@
       transition: 0.2s;
       box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
     }
-
     input.note-input:focus {
       border-color: #66afe9;
       box-shadow: 0 0 5px rgba(102,175,233,0.6);
     }
-
     button.note-save {
       margin-left: 6px;
       padding: 6px 12px;
@@ -72,11 +69,9 @@
       cursor: pointer;
       transition: 0.2s;
     }
-
     button.note-save:hover {
       background-color: #ff9800;
     }
-
     .save-status {
       display: inline-block;
       margin-left: 8px;
@@ -85,7 +80,6 @@
       font-weight: bold;
       transition: opacity 0.3s;
     }
-
     .loading-popup {
       position: fixed;
       top: 0; left: 0;
@@ -110,7 +104,7 @@
 </head>
 <body>
 
-<h2>📋 台車點檢紀錄總覽</h2>
+<h2>📋 燿華台車點檢紀錄總覽</h2>
 <input type="text" id="search" placeholder="🔍 搜尋台車編號、工號、內容…">
 
 <div class="container">
@@ -120,7 +114,6 @@
   </table>
 </div>
 
-<!-- ✅ loading 視窗 -->
 <div id="loading" class="loading-popup">
   <div class="loading-box" id="loading-text">⏳ 載入中…</div>
 </div>
@@ -129,7 +122,18 @@
   const GAS_URL = "https://script.google.com/macros/s/AKfycbxBYOrRPbzVUeiZmJHvL17tPHt_lcyvr3R84Op-fY00Owq1ysr1sl-LFBvT-BfL_biTsQ/exec?mode=list";
   const GAS_URL_SAVE = "https://script.google.com/macros/s/AKfycbxBYOrRPbzVUeiZmJHvL17tPHt_lcyvr3R84Op-fY00Owq1ysr1sl-LFBvT-BfL_biTsQ/exec";
 
-  // ✅ 一開始顯示「資料載入中」
+  const columnsToShow = [
+    "時間",
+    "台車編號",
+    "車架與鋁片平台接多％",
+    "鋁片平台台車編合百分常",
+    "車輛/備註描述",
+    "後輪車軸/煞車描述",
+    "整體異常描述",
+    "工號",
+    "備註"
+  ];
+
   const loading = document.getElementById("loading");
   const loadingText = document.getElementById("loading-text");
   loadingText.textContent = "⏳ 資料載入中，請稍候…";
@@ -141,27 +145,29 @@
       const head = document.getElementById("tableHead");
       const body = document.getElementById("tableBody");
 
+      // 取得要顯示的欄位 index
+      const indexesToShow = data.headers.map((h, i) => columnsToShow.includes(h) ? i : -1).filter(i => i !== -1);
+
       // 表頭
-      data.headers.forEach(h => {
+      indexesToShow.forEach(i => {
         const th = document.createElement("th");
-        th.textContent = h;
+        th.textContent = data.headers[i];
         head.appendChild(th);
       });
       const thNote = document.createElement("th");
       thNote.textContent = "新增備註";
       head.appendChild(thNote);
 
-      // 每筆資料列
+      // 資料列
       data.records.forEach(row => {
         const tr = document.createElement("tr");
 
-        row.forEach(cell => {
+        indexesToShow.forEach(i => {
           const td = document.createElement("td");
-          td.textContent = cell || "-";
+          td.textContent = row[i] || "-";
           tr.appendChild(td);
         });
 
-        // 備註輸入與儲存按鈕
         const tdNote = document.createElement("td");
         const input = document.createElement("input");
         input.type = "text";
@@ -174,11 +180,10 @@
 
         const status = document.createElement("span");
         status.className = "save-status";
-        status.textContent = "";
 
         btn.onclick = () => {
-          const timestamp = row[0];  // 時間在第 0 欄
-          const carId = row[1];      // 台車編號在第 1 欄
+          const timestamp = row[0];
+          const carId = row[1]; // 雖沒顯示，但存在
           const note = input.value;
 
           if (!note.trim()) {
@@ -187,7 +192,6 @@
             return;
           }
 
-          // ✅ 顯示儲存中提示
           loadingText.textContent = "⏳ 備註儲存中，請稍候…";
           loading.style.display = "flex";
 
@@ -201,12 +205,9 @@
             loading.style.display = "none";
             status.textContent = "✅ 已儲存！";
             status.style.color = "#28a745";
-
-            // ✅ 找出該列「備註」欄並更新文字內容
             const allTds = tr.querySelectorAll("td");
-            const noteCell = allTds[allTds.length - 2]; // 倒數第2欄是「備註」
+            const noteCell = allTds[allTds.length - 2];
             noteCell.textContent = note;
-
             input.value = "";
             setTimeout(() => status.textContent = "", 3000);
           })
@@ -224,10 +225,8 @@
         body.appendChild(tr);
       });
 
-      // ✅ 資料載入完成後關閉提示
       loading.style.display = "none";
 
-      // 搜尋功能
       document.getElementById("search").addEventListener("input", e => {
         const keyword = e.target.value.trim().toLowerCase();
         Array.from(body.rows).forEach(row => {
