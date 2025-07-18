@@ -110,7 +110,7 @@
 </head>
 <body>
 
-<h2>📋 燿華台車點檢紀錄總覽</h2>
+<h2>📋 台車點檢紀錄總覽</h2>
 <input type="text" id="search" placeholder="🔍 搜尋台車編號、工號、內容…">
 
 <div class="container">
@@ -194,7 +194,7 @@
           fetch(GAS_URL_SAVE, {
             method: "POST",
             headers: { "Content-Type": "application/x-www-form-urlencoded" },
-            body: mode=note&carId=${encodeURIComponent(carId)}&timestamp=${encodeURIComponent(timestamp)}&note=${encodeURIComponent(note)}
+            body: `mode=note&carId=${encodeURIComponent(carId)}&timestamp=${encodeURIComponent(timestamp)}&note=${encodeURIComponent(note)}`
           })
           .then(res => res.text())
           .then(msg => {
