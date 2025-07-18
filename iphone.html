@@ -96,6 +96,9 @@
 <body>
 
 <h2>UT燿華台車點檢系統</h2>
+<label for="cameraSelect">📷 選擇攝影機：</label>
+<select id="cameraSelect" style="width: 100%; padding: 8px; margin-bottom: 16px;"></select>
+
 <div id="reader"></div>
 <p id="carIdDisplay" class="status">📷 等待掃描 QR Code...</p>
 <button id="rescanBtn" style="display:none;">🔄 重新掃描</button>
@@ -145,17 +148,32 @@
   let qrScanner;
   let intervalId;
 
-  const startScan = () => {
+  const startScan = (deviceIdToUse) => {
   Html5Qrcode.getCameras().then(devices => {
-    // 嘗試尋找包含 "back" 或 "environment" 的鏡頭名稱
-    const backCamera = devices.find(d => 
-      d.label.toLowerCase().includes("back") || 
-      d.label.toLowerCase().includes("environment")
-    ) || devices[0]; // 若找不到就使用第一個
+    const select = document.getElementById("cameraSelect");
+    select.innerHTML = "";
+
+    devices.forEach(device => {
+      const option = document.createElement("option");
+      option.value = device.id;
+      option.text = device.label || `Camera ${select.length + 1}`;
+      select.appendChild(option);
+    });
+
+    // 記住上次選擇的攝影機
+    const savedDeviceId = localStorage.getItem("selectedCameraId");
+    if (savedDeviceId && devices.some(d => d.id === savedDeviceId)) {
+      select.value = savedDeviceId;
+    }
+
+    // 如果沒有傳入參數，就用選單的值
+    const selectedId = deviceIdToUse || select.value || devices[0]?.id;
+    select.value = selectedId;  // 設定選單選中
+    localStorage.setItem("selectedCameraId", selectedId);  // 記憶
 
     qrScanner = new Html5Qrcode("reader");
     qrScanner.start(
-      { deviceId: { exact: backCamera.id } }, // 明確指定後鏡頭
+      { deviceId: { exact: selectedId } },
       {
         fps: 5,
         qrbox: 250,
@@ -188,6 +206,16 @@
 };
 
   startScan();
+  document.getElementById("cameraSelect").addEventListener("change", () => {
+  const selectedId = document.getElementById("cameraSelect").value;
+  localStorage.setItem("selectedCameraId", selectedId);  // ⬅ 加這行
+  if (qrScanner) {
+    qrScanner.stop().then(() => {
+      qrScanner.clear();
+      startScan(selectedId);
+    });
+  }
+});
 
   document.getElementById("rescanBtn").addEventListener("click", () => {
     document.getElementById("checkForm").style.display = "none";
