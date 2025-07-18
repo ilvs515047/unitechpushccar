@@ -188,41 +188,45 @@
   }
 
   async function startScan() {
-    if (!currentCameraId) return;
+  if (!currentCameraId) return;
 
-    // << 修改點 2: 移除在此處重複建立物件的程式碼
-    
-    await qrScanner.start(
-      currentCameraId,
-      {
-        fps: 5,
-        qrbox: 250,
-      },
-      (qrCodeMessage) => {
-        scannedCarId = qrCodeMessage.trim();
-        document.getElementById("carIdDisplay").innerText = `📷 此為編號：「${scannedCarId}」的台車`;
-        if (qrScanner.isScanning) {
-           qrScanner.stop();
-        }
-        clearInterval(intervalId);
-        document.getElementById("reader").style.display = "none";
-        document.getElementById("cameraSelect").style.display = "none";
-        document.getElementById("checkForm").style.display = "block";
-        document.getElementById("rescanBtn").style.display = "block"; // 使用 block
-      },
-      (errorMessage) => {
-        // 錯誤訊息通常不用顯示給使用者，避免干擾
+  await qrScanner.start(
+    { deviceId: { exact: currentCameraId } },
+    {
+      fps: 5,
+      qrbox: 250,
+      aspectRatio: 1.0, // 固定比例較穩定
+      videoConstraints: {
+        width: { ideal: 300 },
+        height: { ideal: 300 },
+        facingMode: "environment"
       }
-    );
+    },
+    (qrCodeMessage) => {
+      scannedCarId = qrCodeMessage.trim();
+      document.getElementById("carIdDisplay").innerText = `📷 此為編號：「${scannedCarId}」的台車`;
+      if (qrScanner.isScanning) {
+        qrScanner.stop();
+      }
+      clearInterval(intervalId);
+      document.getElementById("reader").style.display = "none";
+      document.getElementById("cameraSelect").style.display = "none";
+      document.getElementById("checkForm").style.display = "block";
+      document.getElementById("rescanBtn").style.display = "block";
+    },
+    (errorMessage) => {
+      // 不顯示錯誤以免干擾
+    }
+  );
 
-    // 此自動對焦的技巧可保留
-    intervalId = setInterval(() => {
-       if (qrScanner.isScanning) {
-          qrScanner.pause(true); // pause for 300ms and then resume
-          setTimeout(() => qrScanner.resume(), 300);
-       }
-    }, 5000);
-  }
+  // 自動 pause/resume 可釋放解碼資源
+  intervalId = setInterval(() => {
+    if (qrScanner.isScanning) {
+      qrScanner.pause(true); // 暫停影像輸入
+      setTimeout(() => qrScanner.resume(), 300); // 300ms 後恢復
+    }
+  }, 5000);
+}
 
   // << 修改點 3: 簡化 restartScanner 函式
   async function restartScanner() {
