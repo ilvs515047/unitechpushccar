@@ -21,6 +21,14 @@
       max-width: 320px;
       margin: 0 auto 20px;
     }
+    #cameraSelect {
+      display: block;
+      margin: 0 auto 10px;
+      padding: 6px;
+      font-size: 14px;
+      width: 100%;
+      max-width: 320px;
+    }
     .status {
       text-align: center;
       font-weight: bold;
@@ -85,6 +93,7 @@
 <body>
 
 <h2>📋 UT燿華台車點檢紀錄查詢（快取版）</h2>
+<select id="cameraSelect"></select>
 <div id="reader"></div>
 <p id="carIdDisplay" class="status">📷 等待掃描 QR Code...</p>
 <div id="resultArea"></div>
@@ -94,101 +103,128 @@
 <script>
   const GAS_URL = "https://script.google.com/macros/s/AKfycbyqPEMYcuv3idN9icLCSgIrz7OiPbhVFDQwXcyW8j_Y1iK0FENbjEv-74CHsycONrznqA/exec";
   let allRecords = [];
-  let headers = [];
   let scannedCarId = "";
+  let currentCameraId = null;
+  const qrScanner = new Html5Qrcode("reader");
 
-  // ✅ 一開始預載所有資料
-  function preloadData() {
-    fetch(`${GAS_URL}?mode=list`)
-      .then(res => res.json())
-      .then(data => {
-        allRecords = data.records || [];
-        headers = data.headers || [];
-        document.getElementById("loadingOverlay").style.display = "none";
-        startScanner();
-      })
-      .catch(err => {
-        document.getElementById("loadingOverlay").innerText = "❌ 載入資料失敗：" + err.message;
+  // ✅ 載入攝影機清單
+  async function initCameraOptions() {
+    try {
+      const devices = await Html5Qrcode.getCameras();
+      const select = document.getElementById("cameraSelect");
+      select.innerHTML = "";
+
+      if (devices.length === 0) {
+        alert("找不到攝影機！");
+        return;
+      }
+
+      devices.forEach((device, index) => {
+        const option = document.createElement("option");
+        option.value = device.id;
+        option.text = device.label || `Camera ${index + 1}`;
+        select.appendChild(option);
       });
+
+      currentCameraId = select.value;
+      select.addEventListener("change", async () => {
+        currentCameraId = select.value;
+        await restartScanner();
+      });
+
+      await startScanner();
+    } catch (err) {
+      alert("無法存取攝影機：" + err.message);
+    }
   }
 
-  // ✅ 啟動 QR 掃描
-  function startScanner() {
-    const readerWrapper = document.getElementById("reader");
-    readerWrapper.innerHTML = "";
-    const newDiv = document.createElement("div");
-    newDiv.id = "reader-inner";
-    readerWrapper.appendChild(newDiv);
+  // ✅ 啟動掃描器
+  async function startScanner() {
+    if (!currentCameraId) return;
 
-    const scanner = new Html5Qrcode("reader-inner");
-    scanner.start(
-      { facingMode: "environment" },
+    await qrScanner.start(
+      currentCameraId,
       {
         fps: 5,
-        qrbox: 250,
         aspectRatio: 1.777,
+        qrbox: { width: 250, height: 250 },
         videoConstraints: {
           width: { ideal: 640 },
-          height: { ideal: 480 }
+          height: { ideal: 480 },
+          facingMode: "environment"
         }
       },
-      qrCodeMessage => {
+      (qrCodeMessage) => {
         scannedCarId = qrCodeMessage.trim();
         document.getElementById("carIdDisplay").innerText = `🚚 台車編號：${scannedCarId}`;
-        scanner.stop().then(() => {
-          scanner.clear();
+        qrScanner.stop().then(() => {
           displayResultFromCache(scannedCarId);
-        }).catch(err => {
-          document.getElementById("carIdDisplay").innerText = "❌ 停止掃描器失敗：" + err;
         });
       },
-      errorMessage => {}
-    ).catch(err => {
-      document.getElementById("carIdDisplay").innerText = "❌ 攝影機啟用錯誤：" + err;
-    });
+      (errorMessage) => {
+        // 可忽略
+      }
+    );
   }
 
-  // ✅ 根據快取資料與表頭顯示結果
+  async function restartScanner() {
+    if (qrScanner && qrScanner.isScanning) {
+      await qrScanner.stop();
+    }
+    await startScanner();
+  }
+
+  // ✅ 根據快取資料顯示結果
   function displayResultFromCache(carId) {
-  // 找出所有相符紀錄，並依時間排序（新→舊）
-  const matches = allRecords
-    .filter(r => r.carId === carId)
-    .sort((a, b) => new Date(b.time) - new Date(a.time)); // 假設 time 格式為 "yyyy-MM-dd HH:mm:ss"
+    const matches = allRecords
+      .filter(r => r.carId === carId)
+      .sort((a, b) => new Date(b.time) - new Date(a.time));
+    const result = matches[0];
+    const resultArea = document.getElementById("resultArea");
 
-  const result = matches[0]; // 最新那一筆
-  const resultArea = document.getElementById("resultArea");
+    if (!result) {
+      resultArea.innerHTML = `<p class="error">❌ 查無 ${carId} 的點檢資料</p>`;
+      document.getElementById("rescanBtn").style.display = "inline-block";
+      return;
+    }
 
-  if (!result) {
-    resultArea.innerHTML = `<p class="error">❌ 查無 ${carId} 的點檢資料</p>`;
+    resultArea.innerHTML = `<div class="info">📅 點檢時間：${result.time}</div>`;
+    const fields = Object.entries(result).filter(([key]) => !['carId', 'time'].includes(key));
+
+    for (const [key, val] of fields) {
+      resultArea.innerHTML += `
+        <div class="card">
+          <div class="card-title">${key}</div>
+          <div class="card-content">${val || "-"}</div>
+        </div>
+      `;
+    }
+
     document.getElementById("rescanBtn").style.display = "inline-block";
-    return;
   }
 
-  resultArea.innerHTML = `<div class="info">📅 點檢時間：${result.time}</div>`;
-
-  const fields = Object.entries(result).filter(([key]) => !['carId', 'time'].includes(key));
-  for (const [key, val] of fields) {
-    resultArea.innerHTML += `
-      <div class="card">
-        <div class="card-title">${key}</div>
-        <div class="card-content">${val || "-"}</div>
-      </div>
-    `;
-  }
-
-  document.getElementById("rescanBtn").style.display = "inline-block";
-}
-
-  document.getElementById("rescanBtn").addEventListener("click", () => {
+  // ✅ 點擊重新掃描
+  document.getElementById("rescanBtn").addEventListener("click", async () => {
     document.getElementById("resultArea").innerHTML = "";
     document.getElementById("carIdDisplay").innerText = "📷 等待重新掃描 QR Code...";
     document.getElementById("rescanBtn").style.display = "none";
-    startScanner();
+    await restartScanner();
   });
 
-  // ✅ 預載資料並啟動
-  preloadData();
-</script>
+  // ✅ 預載資料 + 啟動流程
+  async function preloadDataAndInit() {
+    try {
+      const res = await fetch(`${GAS_URL}?mode=list`);
+      const data = await res.json();
+      allRecords = data.records || [];
+      document.getElementById("loadingOverlay").style.display = "none";
+      await initCameraOptions();
+    } catch (err) {
+      document.getElementById("loadingOverlay").innerText = "❌ 載入資料失敗：" + err.message;
+    }
+  }
 
+  preloadDataAndInit();
+</script>
 </body>
 </html>
