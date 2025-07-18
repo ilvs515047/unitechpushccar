@@ -85,6 +85,32 @@
       font-weight: bold;
       transition: opacity 0.3s;
     }
+
+     .loading-popup {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0, 0, 0, 0.3);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+      font-size: 20px;
+      color: white;
+      font-weight: bold;
+      display: none;
+    }
+    .loading-box {
+      background: #333;
+      padding: 20px 40px;
+      border-radius: 12px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    }
+
+
+
+
+    
   </style>
 </head>
 <body>
@@ -148,12 +174,16 @@
           const timestamp = row[0];  // 時間在第 0 欄
           const carId = row[1];      // 台車編號在第 1 欄
           const note = input.value;
+          const loading = document.getElementById("loading");
 
           if (!note.trim()) {
             status.textContent = "請輸入備註";
             status.style.color = "#dc3545";
             return;
           }
+
+  // 顯示等待提示框
+          loading.style.display = "flex";
 
           fetch(GAS_URL_SAVE, {
             method: "POST",
@@ -162,16 +192,19 @@
           })
           .then(res => res.text())
           .then(msg => {
+            loading.style.display = "none";
             status.textContent = "✅ 已儲存！";
             status.style.color = "#28a745";
             input.value = "";
             setTimeout(() => status.textContent = "", 3000);
           })
           .catch(err => {
+            loading.style.display = "none";
             status.textContent = "❌ 儲存失敗";
             status.style.color = "#dc3545";
           });
         };
+
 
         tdNote.appendChild(input);
         tdNote.appendChild(btn);
@@ -195,6 +228,10 @@
       alert("❌ 無法載入資料：" + err.message);
     });
 </script>
-
+  
+<div id="loading" class="loading-popup">
+  <div class="loading-box">⏳ 備註儲存中，請稍候…</div>
+</div>
+  
 </body>
 </html>
