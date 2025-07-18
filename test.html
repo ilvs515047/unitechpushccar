@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>UT 台車點檢表單</title>
+  <title>UT台車點檢紀錄查詢（快取版）</title>
   <script src="https://unpkg.com/html5-qrcode"></script>
   <style>
     body {
       font-family: "Segoe UI", "Microsoft JhengHei", sans-serif;
-      background-color: #f5f5f5;
+      background-color: #f7f7f7;
       padding: 20px;
       margin: 0;
     }
@@ -26,118 +26,70 @@
       font-weight: bold;
       margin-bottom: 10px;
     }
+    .info {
+      text-align: center;
+      font-size: 15px;
+      margin: 8px 0;
+      color: #444;
+    }
+    .error {
+      color: red;
+      text-align: center;
+      font-weight: bold;
+    }
     .card {
       background-color: white;
       border-radius: 12px;
       box-shadow: 0 2px 8px rgba(0,0,0,0.08);
       padding: 16px;
-      margin-bottom: 20px;
+      margin-bottom: 16px;
     }
     .card-title {
       font-weight: bold;
-      margin-bottom: 8px;
-      color: #444;
+      color: #555;
+      margin-bottom: 6px;
     }
-    label {
-      display: block;
-      margin-top: 8px;
-      font-size: 14px;
-    }
-    input[type="text"] {
-      width: 100%;
-      padding: 6px;
-      font-size: 14px;
-      margin-top: 4px;
-      border-radius: 6px;
-      border: 1px solid #ccc;
-    }
-    input[type="checkbox"] {
-      margin-right: 6px;
+    .card-content {
+      font-size: 15px;
+      color: #222;
+      word-wrap: break-word;
     }
     button {
       width: 100%;
       padding: 12px;
-      background-color: #28a745;
+      background-color: #007bff;
       color: white;
       border: none;
       font-size: 16px;
       border-radius: 8px;
       cursor: pointer;
+      margin-top: 12px;
     }
     button:hover {
-      background-color: #218838;
-    }
-    #rescanBtn {
-      margin-top: 10px;
-      background-color: #007bff;
-    }
-    #rescanBtn:hover {
       background-color: #0056b3;
     }
-    #result {
-      text-align: center;
-      margin-top: 20px;
-      font-weight: bold;
-      color: #444;
-    }
     #loadingOverlay {
-      display: none;
+      display: flex;
       position: fixed;
-      top: 0; left: 0; width: 100%; height: 100%;
-      background: rgba(0, 0, 0, 0.5);
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0, 0, 0, 0.4);
       color: white;
-      font-size: 22px;
+      font-size: 20px;
       justify-content: center;
       align-items: center;
-      z-index: 9999;
+      z-index: 999;
     }
   </style>
 </head>
 <body>
 
-<h2>UT燿華台車點檢系統</h2>
+<h2>📋 UT燿華台車點檢紀錄查詢（快取版）</h2>
 <div id="reader"></div>
 <p id="carIdDisplay" class="status">📷 等待掃描 QR Code...</p>
+<div id="resultArea"></div>
 <button id="rescanBtn" style="display:none;">🔄 重新掃描</button>
-
-<form id="checkForm" style="display:none;">
-  <div class="card">
-    <div class="card-title">👷‍♂️ 點檢人員工號</div>
-    <label><input type="text" name="workerId" required></label>
-  </div>
-
-  <div class="card">
-    <div class="card-title">🔧 前輪（轉向輪）</div>
-    <label>1. 焊接多少% <input type="text" name="f1"></label>
-    <label><input type="checkbox" name="f1_ok"> 無異常</label>
-    <label>2. 平台&車輪是否異常 <input type="text" name="f2"></label>
-    <label><input type="checkbox" name="f2_ok"> 無異常</label>
-    <label>3. 車輪/煞車描述 <input type="text" name="f3"></label>
-    <label><input type="checkbox" name="f3_ok"> 無異常</label>
-  </div>
-
-  <div class="card">
-    <div class="card-title">🔧 後輪（手把端）</div>
-    <label>1. 焊接多少% <input type="text" name="b1"></label>
-    <label><input type="checkbox" name="b1_ok"> 無異常</label>
-    <label>2. 平台&車輪是否異常 <input type="text" name="b2"></label>
-    <label><input type="checkbox" name="b2_ok"> 無異常</label>
-    <label>3. 車輪/煞車描述 <input type="text" name="b3"></label>
-    <label><input type="checkbox" name="b3_ok"> 無異常</label>
-  </div>
-
-  <div class="card">
-    <div class="card-title">🔧 車架/骨架接縫處</div>
-    <label>描述狀況 <input type="text" name="frame"></label>
-    <label><input type="checkbox" name="frame_ok"> 無異常</label>
-  </div>
-
-  <button type="submit">✅ 提交點檢</button>
-</form>
-
-<p id="result"></p>
-
-<div id="loadingOverlay">⌛ 提交中...請稍候</div>
+<div id="loadingOverlay">👌 資料庫載入中，等等喔，會花點時間，但可以快速查詢大量台車</div>
 
 <script>
   const GAS_URL = "https://script.google.com/macros/s/AKfycbyqPEMYcuv3idN9icLCSgIrz7OiPbhVFDQwXcyW8j_Y1iK0FENbjEv-74CHsycONrznqA/exec";
@@ -147,7 +99,7 @@
 
   // ✅ 一開始預載所有資料
   function preloadData() {
-    fetch(`${GAS_URL}?mode=list`)
+    fetch(${GAS_URL}?mode=list)
       .then(res => res.json())
       .then(data => {
         allRecords = data.records || [];
@@ -160,7 +112,7 @@
       });
   }
 
-  // ✅ 啟動 QR 掃描（包含後鏡頭自動選擇邏輯）
+  // ✅ 啟動 QR 掃描
   function startScanner() {
     const readerWrapper = document.getElementById("reader");
     readerWrapper.innerHTML = "";
@@ -169,69 +121,63 @@
     readerWrapper.appendChild(newDiv);
 
     const scanner = new Html5Qrcode("reader-inner");
-
-    // 嘗試列出裝置並選擇後鏡頭
-    navigator.mediaDevices.enumerateDevices().then(devices => {
-      const videoDevices = devices.filter(d => d.kind === "videoinput");
-      const backCam = videoDevices.find(d => d.label.toLowerCase().includes("back")) || videoDevices[1];
-
-      const cameraConfig = backCam
-        ? { deviceId: { exact: backCam.deviceId } }
-        : { facingMode: "environment" }; // 備用方案
-
-      scanner.start(
-        cameraConfig,
-        {
-          fps: 5,
-          qrbox: 250,
-          aspectRatio: 1.777,
-          videoConstraints: { width: { ideal: 640 }, height: { ideal: 480 } }
-        },
-        qrCodeMessage => {
-          scannedCarId = qrCodeMessage.trim();
-          document.getElementById("carIdDisplay").innerText = `🚚 台車編號：${scannedCarId}`;
-          scanner.stop().then(() => {
-            scanner.clear();
-            displayResultFromCache(scannedCarId);
-          }).catch(err => {
-            document.getElementById("carIdDisplay").innerText = "❌ 停止掃描器失敗：" + err;
-          });
-        },
-        errorMessage => {}
-      ).catch(err => {
-        document.getElementById("carIdDisplay").innerText = "❌ 攝影機啟用錯誤：" + err;
-      });
+    scanner.start(
+      { facingMode: "environment" },
+      {
+        fps: 5,
+        qrbox: 250,
+        aspectRatio: 1.777,
+        videoConstraints: {
+          width: { ideal: 640 },
+          height: { ideal: 480 }
+        }
+      },
+      qrCodeMessage => {
+        scannedCarId = qrCodeMessage.trim();
+        document.getElementById("carIdDisplay").innerText = 🚚 台車編號：${scannedCarId};
+        scanner.stop().then(() => {
+          scanner.clear();
+          displayResultFromCache(scannedCarId);
+        }).catch(err => {
+          document.getElementById("carIdDisplay").innerText = "❌ 停止掃描器失敗：" + err;
+        });
+      },
+      errorMessage => {}
+    ).catch(err => {
+      document.getElementById("carIdDisplay").innerText = "❌ 攝影機啟用錯誤：" + err;
     });
   }
 
-  // ✅ 顯示結果
+  // ✅ 根據快取資料與表頭顯示結果
   function displayResultFromCache(carId) {
-    const matches = allRecords
-      .filter(r => r.carId === carId)
-      .sort((a, b) => new Date(b.time) - new Date(a.time));
+  // 找出所有相符紀錄，並依時間排序（新→舊）
+  const matches = allRecords
+    .filter(r => r.carId === carId)
+    .sort((a, b) => new Date(b.time) - new Date(a.time)); // 假設 time 格式為 "yyyy-MM-dd HH:mm:ss"
 
-    const result = matches[0];
-    const resultArea = document.getElementById("resultArea");
+  const result = matches[0]; // 最新那一筆
+  const resultArea = document.getElementById("resultArea");
 
-    if (!result) {
-      resultArea.innerHTML = `<p class="error">❌ 查無 ${carId} 的點檢資料</p>`;
-      document.getElementById("rescanBtn").style.display = "inline-block";
-      return;
-    }
-
-    resultArea.innerHTML = `<div class="info">📅 點檢時間：${result.time}</div>`;
-    const fields = Object.entries(result).filter(([key]) => !['carId', 'time'].includes(key));
-
-    for (const [key, val] of fields) {
-      resultArea.innerHTML += `
-        <div class="card">
-          <div class="card-title">${key}</div>
-          <div class="card-content">${val || "-"}</div>
-        </div>`;
-    }
-
+  if (!result) {
+    resultArea.innerHTML = <p class="error">❌ 查無 ${carId} 的點檢資料</p>;
     document.getElementById("rescanBtn").style.display = "inline-block";
+    return;
   }
+
+  resultArea.innerHTML = <div class="info">📅 點檢時間：${result.time}</div>;
+
+  const fields = Object.entries(result).filter(([key]) => !['carId', 'time'].includes(key));
+  for (const [key, val] of fields) {
+    resultArea.innerHTML += 
+      <div class="card">
+        <div class="card-title">${key}</div>
+        <div class="card-content">${val || "-"}</div>
+      </div>
+    ;
+  }
+
+  document.getElementById("rescanBtn").style.display = "inline-block";
+}
 
   document.getElementById("rescanBtn").addEventListener("click", () => {
     document.getElementById("resultArea").innerHTML = "";
@@ -243,5 +189,6 @@
   // ✅ 預載資料並啟動
   preloadData();
 </script>
+
 </body>
 </html>
