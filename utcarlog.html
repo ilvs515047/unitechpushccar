@@ -195,17 +195,8 @@
             loading.style.display = "none";
             status.textContent = "✅ 已儲存！";
             status.style.color = "#28a745";
-
-  // 🌟 將備註內容顯示到該列的新欄位中（假裝已更新）
-            const newNoteTd = document.createElement("td");
-            newNoteTd.textContent = note;
-            newNoteTd.colSpan = 1;
-
-  // 移除原本的新增備註輸入區
-            tdNote.innerHTML = "";
-            tdNote.appendChild(newNoteTd);
-
-  // 清空輸入框內容（不再需要，因為已被移除）
+            input.value = "";
+            setTimeout(() => status.textContent = "", 3000);
           })
           .catch(err => {
             loading.style.display = "none";
