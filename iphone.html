@@ -74,13 +74,6 @@
     #rescanBtn:hover {
       background-color: #0056b3;
     }
-    #switchCameraBtn {
-      margin-top: 10px;
-      background-color: #6c757d;
-    }
-    #switchCameraBtn:hover {
-      background-color: #5a6268;
-    }
     #result {
       text-align: center;
       margin-top: 20px;
@@ -106,7 +99,6 @@
 <div id="reader"></div>
 <p id="carIdDisplay" class="status">📷 等待掃描 QR Code...</p>
 <button id="rescanBtn" style="display:none;">🔄 重新掃描</button>
-<button id="switchCameraBtn" style="display:none;">📱 切換鏡頭</button>
 
 <form id="checkForm" style="display:none;">
   <div class="card">
@@ -152,74 +144,27 @@
   let scannedCarId = "";
   let qrScanner;
   let intervalId;
-  let currentCamera = "environment"; // 預設使用後置鏡頭
-  let availableCameras = [];
 
-  const getCameras = async () => {
-    try {
-      const cameras = await Html5Qrcode.getCameras();
-      availableCameras = cameras;
-      console.log("可用攝影機:", cameras);
-      
-      // 如果有多個攝影機，顯示切換按鈕
-      if (cameras.length > 1) {
-        document.getElementById("switchCameraBtn").style.display = "inline-block";
-      }
-      
-      return cameras;
-    } catch (err) {
-      console.error("無法取得攝影機清單:", err);
-      return [];
-    }
-  };
+  const startScan = () => {
+  Html5Qrcode.getCameras().then(devices => {
+    // 嘗試尋找包含 "back" 或 "environment" 的鏡頭名稱
+    const backCamera = devices.find(d => 
+      d.label.toLowerCase().includes("back") || 
+      d.label.toLowerCase().includes("environment")
+    ) || devices[0]; // 若找不到就使用第一個
 
-  const startScan = async () => {
     qrScanner = new Html5Qrcode("reader");
-    
-    // 先嘗試取得攝影機清單
-    const cameras = await getCameras();
-    
-    // 設定攝影機配置
-    let cameraConfig;
-    
-    if (cameras.length > 0) {
-      // 嘗試找到後置鏡頭
-      const backCamera = cameras.find(camera => 
-        camera.label.toLowerCase().includes('back') || 
-        camera.label.toLowerCase().includes('rear') ||
-        camera.label.toLowerCase().includes('environment')
-      );
-      
-      if (backCamera && currentCamera === "environment") {
-        cameraConfig = backCamera.id;
-      } else if (currentCamera === "user") {
-        const frontCamera = cameras.find(camera => 
-          camera.label.toLowerCase().includes('front') || 
-          camera.label.toLowerCase().includes('user')
-        );
-        cameraConfig = frontCamera ? frontCamera.id : cameras[0].id;
-      } else {
-        // 預設使用第一個攝影機（通常是後置鏡頭）
-        cameraConfig = cameras[0].id;
-      }
-    } else {
-      // 如果無法取得攝影機清單，使用 facingMode
-      cameraConfig = { facingMode: currentCamera };
-    }
-
-    const config = {
-      fps: 10,
-      qrbox: { width: 250, height: 250 },
-      aspectRatio: 1.0,
-      videoConstraints: {
-        width: { ideal: 640 },
-        height: { ideal: 480 }
-      }
-    };
-
     qrScanner.start(
-      cameraConfig,
-      config,
+      { deviceId: { exact: backCamera.id } }, // 明確指定後鏡頭
+      {
+        fps: 5,
+        qrbox: 250,
+        aspectRatio: 1.777,
+        videoConstraints: {
+          width: { ideal: 640 },
+          height: { ideal: 480 }
+        }
+      },
       qrCodeMessage => {
         scannedCarId = qrCodeMessage.trim();
         document.getElementById("carIdDisplay").innerText = `📷 此為編號：「${scannedCarId}」的台車`;
@@ -227,41 +172,21 @@
         clearInterval(intervalId);
         document.getElementById("checkForm").style.display = "block";
         document.getElementById("rescanBtn").style.display = "inline-block";
-        document.getElementById("switchCameraBtn").style.display = "none";
       },
-      errorMessage => {
-        // 忽略掃描錯誤訊息
-      }
+      errorMessage => {}
     ).catch(err => {
-      console.error("QR掃描器啟動失敗:", err);
       document.getElementById("carIdDisplay").innerText = "❌ 無法啟用攝影機：" + err;
     });
 
-    // 定期重新啟動掃描以提高穩定性
     intervalId = setInterval(() => {
-      if (qrScanner) {
-        qrScanner.pause();
-        setTimeout(() => {
-          if (qrScanner) {
-            qrScanner.resume();
-          }
-        }, 300);
-      }
+      qrScanner.pause();
+      setTimeout(() => qrScanner.resume(), 300);
     }, 5000);
-  };
-
-  // 切換攝影機
-  document.getElementById("switchCameraBtn").addEventListener("click", () => {
-    currentCamera = currentCamera === "environment" ? "user" : "environment";
-    qrScanner.stop();
-    clearInterval(intervalId);
-    document.getElementById("carIdDisplay").innerText = `📷 切換至${currentCamera === "environment" ? "後置" : "前置"}鏡頭...`;
-    setTimeout(() => {
-      startScan();
-    }, 1000);
+  }).catch(err => {
+    document.getElementById("carIdDisplay").innerText = "❌ 無法讀取攝影機：" + err;
   });
+};
 
-  // 初始化
   startScan();
 
   document.getElementById("rescanBtn").addEventListener("click", () => {
@@ -269,9 +194,6 @@
     document.getElementById("result").innerText = "";
     document.getElementById("carIdDisplay").innerText = "📷 等待重新掃描 QR Code...";
     document.getElementById("rescanBtn").style.display = "none";
-    if (availableCameras.length > 1) {
-      document.getElementById("switchCameraBtn").style.display = "inline-block";
-    }
     qrScanner.clear();
     startScan();
   });
