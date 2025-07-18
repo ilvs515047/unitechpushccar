@@ -99,7 +99,7 @@
 
   // ✅ 一開始預載所有資料
   function preloadData() {
-    fetch(${GAS_URL}?mode=list)
+    fetch(`${GAS_URL}?mode=list`)
       .then(res => res.json())
       .then(data => {
         allRecords = data.records || [];
