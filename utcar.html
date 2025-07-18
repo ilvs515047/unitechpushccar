@@ -28,6 +28,7 @@
       border-radius: 12px;
       box-shadow: 0 4px 12px rgba(0,0,0,0.15);
       transition: transform 0.3s ease;
+      cursor: pointer;
     }
     .logo:hover {
       transform: scale(1.05);
@@ -62,7 +63,7 @@
   <h1>🚚 UT 台車點檢系統</h1>
 
   <!-- ✅ 插入現代可愛風格 LOGO -->
-  <img class="logo" src="https://github.com/ilvs515047/unitechpushccar/blob/main/pushcar.png?raw=true" alt="Unitech Logo" />
+  <img id="easterEggLogo" class="logo" src="https://github.com/ilvs515047/unitechpushccar/blob/main/pushcar.png?raw=true" alt="Unitech Logo" />
 
   <div class="button-container">
     <button class="cute-button" onclick="location.href='https://ilvs515047.github.io/unitechpushccar/test.html'">
@@ -75,6 +76,19 @@
       📋 維護課後台總表
     </button>
   </div>
+
+  <script>
+    let logoClickCount = 0;
+    const logoElement = document.getElementById('easterEggLogo');
+
+    logoElement.addEventListener('click', () => {
+      logoClickCount++;
+      if (logoClickCount === 5) {
+        alert('🎉 BY 16課 🎉');
+        logoClickCount = 0; // 重設計數器
+      }
+    });
+  </script>
 
 </body>
 </html>
