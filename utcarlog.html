@@ -254,7 +254,7 @@
   // 僅在登入後才抓資料
   async function initAppAfterAuth() {
     if (!isAuthed()) return; // 保險
-    showLoading("⏳ 資料載入中，請稍候…");
+    showLoading("⏳ 歷史數據資料載入中，請耐心等候，感恩…");
     try {
       const res = await fetch(GAS_URL);
       const data = await res.json();
