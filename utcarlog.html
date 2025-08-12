@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>📋 燿華台車點檢紀錄總覽</title>
   <style>
+    :root { color-scheme: light; }
     body {
       font-family: "Segoe UI", "Microsoft JhengHei", sans-serif;
       margin: 0; padding: 20px;
@@ -36,15 +37,9 @@
       padding: 8px;
       text-align: center;
     }
-    th {
-      background-color: #ffdd99;
-    }
-    tr:nth-child(even) {
-      background-color: #fdf6ea;
-    }
-    .container {
-      overflow-x: auto;
-    }
+    th { background-color: #ffdd99; }
+    tr:nth-child(even) { background-color: #fdf6ea; }
+    .container { overflow-x: auto; }
 
     input.note-input {
       width: 70%;
@@ -55,12 +50,10 @@
       transition: 0.2s;
       box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
     }
-
     input.note-input:focus {
       border-color: #66afe9;
       box-shadow: 0 0 5px rgba(102,175,233,0.6);
     }
-
     button.note-save {
       margin-left: 6px;
       padding: 6px 12px;
@@ -72,11 +65,7 @@
       cursor: pointer;
       transition: 0.2s;
     }
-
-    button.note-save:hover {
-      background-color: #ff9800;
-    }
-
+    button.note-save:hover { background-color: #ff9800; }
     .save-status {
       display: inline-block;
       margin-left: 8px;
@@ -87,18 +76,13 @@
     }
 
     .loading-popup {
-      position: fixed;
-      top: 0; left: 0;
-      width: 100%; height: 100%;
+      position: fixed; inset: 0;
       background: rgba(0, 0, 0, 0.3);
-      display: flex;
+      display: none;
       justify-content: center;
       align-items: center;
       z-index: 9999;
-      font-size: 20px;
-      color: white;
-      font-weight: bold;
-      display: none;
+      font-size: 20px; color: white; font-weight: bold;
     }
     .loading-box {
       background: #333;
@@ -106,41 +90,178 @@
       border-radius: 12px;
       box-shadow: 0 4px 10px rgba(0,0,0,0.3);
     }
+
+    /* ===== 授權門（密碼輸入） ===== */
+    #authOverlay {
+      position: fixed; inset: 0; z-index: 10000;
+      background: linear-gradient(160deg,#1f2937,#111827);
+      display: flex; align-items: center; justify-content: center;
+      color: #e5e7eb;
+    }
+    .auth-card {
+      width: min(92vw, 420px);
+      background: #111827;
+      border: 1px solid #374151;
+      border-radius: 16px;
+      padding: 22px;
+      box-shadow: 0 10px 30px rgba(0,0,0,.35);
+    }
+    .auth-title { font-size: 18px; margin: 0 0 12px; }
+    .auth-hint { opacity:.85; font-size: 14px; margin-bottom: 12px; }
+    .auth-row { display: flex; gap: 8px; }
+    .auth-input {
+      flex: 1; padding: 10px 12px; border-radius: 10px;
+      background: #0b1220; color: #e5e7eb; border: 1px solid #334155;
+      outline: none; font-size: 16px;
+    }
+    .auth-input:focus { border-color: #60a5fa; box-shadow: 0 0 0 3px rgba(59,130,246,.25); }
+    .auth-btn {
+      padding: 10px 14px; border-radius: 10px; border: none; cursor: pointer;
+      background: #60a5fa; color: #0b1220; font-weight: 700;
+    }
+    .auth-btn:hover { filter: brightness(1.05); }
+    .auth-err { color: #fca5a5; font-size: 13px; min-height: 18px; margin-top: 8px; }
+    .topbar {
+      position: sticky; top: 0; display: flex; justify-content: flex-end; gap: 8px;
+      margin: -8px 0 8px; padding: 8px 0;
+    }
+    .logout-btn {
+      padding: 6px 10px; border-radius: 10px; border: 1px solid #ddd; background: #fff; cursor: pointer;
+    }
   </style>
 </head>
 <body>
 
-<h2>📋 燿華電子台車點檢紀錄總覽</h2>
-<input type="text" id="search" placeholder="🔍 搜尋台車編號、工號、內容…">
-
-<div class="container">
-  <table id="recordTable">
-    <thead><tr id="tableHead"></tr></thead>
-    <tbody id="tableBody"></tbody>
-  </table>
+<!-- ======= 密碼保護門 ======= -->
+<div id="authOverlay" aria-modal="true" role="dialog">
+  <div class="auth-card">
+    <h3 class="auth-title">🔐 需要密碼</h3>
+    <p class="auth-hint">請輸入存放在此 HTML 的密碼後進入系統。</p>
+    <div class="auth-row">
+      <input id="authInput" class="auth-input" type="password" placeholder="輸入密碼" autocomplete="current-password" />
+      <button id="authBtn" class="auth-btn">登入</button>
+    </div>
+    <div id="authErr" class="auth-err"></div>
+  </div>
 </div>
 
-<div id="loading" class="loading-popup">
-  <div class="loading-box" id="loading-text">⏳ 載入中…</div>
+<!-- ======= 主要內容（預設隱藏） ======= -->
+<div id="app" style="display:none;">
+  <div class="topbar">
+    <button id="logoutBtn" class="logout-btn">🚪 登出</button>
+  </div>
+
+  <h2>📋 燿華電子台車點檢紀錄總覽</h2>
+  <input type="text" id="search" placeholder="🔍 搜尋台車編號、工號、內容…">
+
+  <div class="container">
+    <table id="recordTable">
+      <thead><tr id="tableHead"></tr></thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+  </div>
+
+  <div id="loading" class="loading-popup">
+    <div class="loading-box" id="loading-text">⏳ 載入中…</div>
+  </div>
 </div>
 
 <script>
+  // ========================
+  // 1) 基本密碼設定（明碼）
+  // ========================
+  // ⚠️ 注意：這是前端保護，密碼會被看到，僅適合臨時/內網使用。
+  // 直接修改下方密碼即可：
+  const PLAINTEXT_PASSWORD = "123456"; // ←←← 改成你要的密碼
+
+  // 是否記住登入（以小時計）
+  const REMEMBER_HOURS = 8; // 8 小時內免再次輸入
+  const AUTH_KEY = "ut_cart_admin_authed";
+
+  function setAuthed(hours) {
+    const expAt = Date.now() + hours * 3600 * 1000;
+    localStorage.setItem(AUTH_KEY, String(expAt));
+  }
+  function isAuthed() {
+    const v = Number(localStorage.getItem(AUTH_KEY) || 0);
+    return v > Date.now();
+  }
+  function logout() {
+    localStorage.removeItem(AUTH_KEY);
+    document.getElementById('app').style.display = 'none';
+    document.getElementById('authOverlay').style.display = 'flex';
+    document.getElementById('authInput').value = '';
+    document.getElementById('authInput').focus();
+  }
+
+  // 授權流程
+  const $overlay = document.getElementById('authOverlay');
+  const $app = document.getElementById('app');
+  const $input = document.getElementById('authInput');
+  const $btn = document.getElementById('authBtn');
+  const $err = document.getElementById('authErr');
+  const $logout = document.getElementById('logoutBtn');
+
+  function unlockIfAuthed() {
+    if (isAuthed()) {
+      $overlay.style.display = 'none';
+      $app.style.display = '';
+    }
+  }
+
+  function tryLogin() {
+    const pw = ($input.value || '').trim();
+    if (!pw) {
+      $err.textContent = '請先輸入密碼';
+      return;
+    }
+    if (pw === PLAINTEXT_PASSWORD) {
+      setAuthed(REMEMBER_HOURS);
+      $overlay.style.display = 'none';
+      $app.style.display = '';
+      $err.textContent = '';
+    } else {
+      $err.textContent = '密碼錯誤';
+    }
+  }
+
+  $btn.addEventListener('click', tryLogin);
+  $input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') tryLogin();
+  });
+  $logout.addEventListener('click', logout);
+
+  // 初次啟動
+  unlockIfAuthed();
+  if ($overlay.style.display !== 'none') $input.focus();
+
+  // ========================
+  // 2) 你的原本業務程式碼
+  // ========================
   const GAS_URL = "https://script.google.com/macros/s/AKfycbxBYOrRPbzVUeiZmJHvL17tPHt_lcyvr3R84Op-fY00Owq1ysr1sl-LFBvT-BfL_biTsQ/exec?mode=list";
   const GAS_URL_SAVE = "https://script.google.com/macros/s/AKfycbxBYOrRPbzVUeiZmJHvL17tPHt_lcyvr3R84Op-fY00Owq1ysr1sl-LFBvT-BfL_biTsQ/exec";
 
   const loading = document.getElementById("loading");
   const loadingText = document.getElementById("loading-text");
-  loadingText.textContent = "⏳ 資料載入中，請稍候…";
-  loading.style.display = "flex";
-
   const hiddenColumnIndexes = [2, 3]; // 第 3 與第 4 欄隱藏（從 0 起算）
 
-  fetch(GAS_URL)
-    .then(res => res.json())
-    .then(data => {
+  function showLoading(msg) {
+    loadingText.textContent = msg || "⏳ 載入中…";
+    loading.style.display = "flex";
+  }
+  function hideLoading() { loading.style.display = "none"; }
+
+  // 僅在登入後才抓資料
+  async function initAppAfterAuth() {
+    if (!isAuthed()) return; // 保險
+    showLoading("⏳ 資料載入中，請稍候…");
+    try {
+      const res = await fetch(GAS_URL);
+      const data = await res.json();
       const head = document.getElementById("tableHead");
       const body = document.getElementById("tableBody");
 
+      // 表頭
       data.headers.forEach((h, i) => {
         if (hiddenColumnIndexes.includes(i)) return;
         const th = document.createElement("th");
@@ -151,9 +272,9 @@
       thNote.textContent = "新增備註";
       head.appendChild(thNote);
 
+      // 內容列
       data.records.forEach(row => {
         const tr = document.createElement("tr");
-
         row.forEach((cell, i) => {
           if (hiddenColumnIndexes.includes(i)) return;
           const td = document.createElement("td");
@@ -175,43 +296,37 @@
         status.className = "save-status";
         status.textContent = "";
 
-        btn.onclick = () => {
+        btn.onclick = async () => {
           const timestamp = row[0];
           const carId = row[1];
           const note = input.value;
-
           if (!note.trim()) {
             status.textContent = "請輸入備註";
             status.style.color = "#dc3545";
             return;
           }
-
-          loadingText.textContent = "⏳ 備註儲存中，請稍候…";
-          loading.style.display = "flex";
-
-          fetch(GAS_URL_SAVE, {
-            method: "POST",
-            headers: { "Content-Type": "application/x-www-form-urlencoded" },
-            body: `mode=note&carId=${encodeURIComponent(carId)}&timestamp=${encodeURIComponent(timestamp)}&note=${encodeURIComponent(note)}`
-          })
-          .then(res => res.text())
-          .then(msg => {
-            loading.style.display = "none";
+          showLoading("⏳ 備註儲存中，請稍候…");
+          try {
+            const res = await fetch(GAS_URL_SAVE, {
+              method: "POST",
+              headers: { "Content-Type": "application/x-www-form-urlencoded" },
+              body: `mode=note&carId=${encodeURIComponent(carId)}&timestamp=${encodeURIComponent(timestamp)}&note=${encodeURIComponent(note)}`
+            });
+            await res.text();
+            hideLoading();
             status.textContent = "✅ 已儲存！";
             status.style.color = "#28a745";
 
             const allTds = tr.querySelectorAll("td");
             const noteCell = allTds[allTds.length - 2];
             noteCell.textContent = note;
-
             input.value = "";
             setTimeout(() => status.textContent = "", 3000);
-          })
-          .catch(err => {
-            loading.style.display = "none";
+          } catch (err) {
+            hideLoading();
             status.textContent = "❌ 儲存失敗";
             status.style.color = "#dc3545";
-          });
+          }
         };
 
         tdNote.appendChild(input);
@@ -221,22 +336,32 @@
         body.appendChild(tr);
       });
 
-      loading.style.display = "none";
+      hideLoading();
 
+      // 搜尋
       document.getElementById("search").addEventListener("input", e => {
         const keyword = e.target.value.trim().toLowerCase();
-        Array.from(body.rows).forEach(row => {
+        Array.from(document.getElementById("tableBody").rows).forEach(row => {
           const match = Array.from(row.cells).some(cell =>
             cell.textContent.toLowerCase().includes(keyword)
           );
           row.style.display = match ? "" : "none";
         });
       });
-    })
-    .catch(err => {
-      loading.style.display = "none";
+    } catch (err) {
+      hideLoading();
       alert("❌ 無法載入資料：" + err.message);
-    });
+    }
+  }
+
+  // 在顯示主要內容後初始化資料（避免未授權也打 GAS）
+  if (isAuthed()) initAppAfterAuth();
+  // 若使用者剛登入成功，覆寫 tryLogin 時會顯示 app，再呼叫此初始化
+  const _origTryLogin = tryLogin;
+  tryLogin = function() {
+    _origTryLogin();
+    if (isAuthed()) initAppAfterAuth();
+  }
 </script>
 
 </body>
