@@ -114,12 +114,21 @@ async function initApp(){
   try{
     const res=await fetch(GAS_URL);
     const data=await res.json();
+    console.log("📥 GAS 回傳資料:", data);
+
     const head=document.getElementById("tableHead");
     const body=document.getElementById("tableBody");
+    head.innerHTML=""; body.innerHTML=""; // 清空舊資料
+
+    if (!data || !data.headers || !data.records) {
+      throw new Error("GAS 回傳格式不正確！");
+    }
 
     // 建表頭
     data.headers.forEach(h=>{
-      const th=document.createElement("th"); th.textContent=h; head.appendChild(th);
+      const th=document.createElement("th"); 
+      th.textContent=h; 
+      head.appendChild(th);
     });
 
     // 建表格內容
@@ -127,21 +136,25 @@ async function initApp(){
       const tr=document.createElement("tr");
       row.forEach(cell=>{
         const td=document.createElement("td");
-        td.textContent=cell||"-"; tr.appendChild(td);
+        td.textContent=cell||"-"; 
+        tr.appendChild(td);
       });
       body.appendChild(tr);
     });
 
-    // 全部載完 → 淡出動畫 → 顯示 app
+    // 資料抓完 → 顯示 app
     setTimeout(()=>{
       loader.classList.add("fade-out");
       setTimeout(()=>{
         loader.style.display="none";
-        $app.style.display="";
+        $app.style.display="";   // 確保 app 顯示
       },1000);
-    },800); // 稍微等動畫跑一下
-  }catch(err){
+    },800);
+  } catch(err){
+    console.error("載入失敗:", err);
     loader.querySelector("p").textContent="❌ 載入失敗："+err.message;
+    // 保底顯示 app
+    $app.style.display="";
   }
 }
 </script>
