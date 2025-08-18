@@ -5,363 +5,145 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>📋 燿華台車點檢紀錄總覽</title>
   <style>
-    :root { color-scheme: light; }
-    body {
-      font-family: "Segoe UI", "Microsoft JhengHei", sans-serif;
-      margin: 0; padding: 20px;
-      background-color: #f5faff;
-    }
-    h2 {
-      text-align: center;
-      margin-bottom: 20px;
-      color: #333;
-    }
-    #search {
-      width: 100%;
-      max-width: 300px;
-      margin: 0 auto 16px;
-      display: block;
-      padding: 8px 12px;
-      font-size: 16px;
-      border-radius: 8px;
-      border: 1px solid #ccc;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 10px;
-      font-size: 14px;
-    }
-    th, td {
-      border: 1px solid #ddd;
-      padding: 8px;
-      text-align: center;
-    }
-    th { background-color: #ffdd99; }
-    tr:nth-child(even) { background-color: #fdf6ea; }
-    .container { overflow-x: auto; }
+    body { font-family:"Segoe UI","Microsoft JhengHei",sans-serif; margin:0; padding:20px; background:#f5faff; }
+    h2 { text-align:center; margin-bottom:20px; color:#333; }
+    #search { width:100%; max-width:300px; margin:0 auto 16px; display:block;
+      padding:8px 12px; font-size:16px; border-radius:8px; border:1px solid #ccc; }
+    table { width:100%; border-collapse:collapse; margin-top:10px; font-size:14px; }
+    th,td { border:1px solid #ddd; padding:8px; text-align:center; }
+    th { background:#ffdd99; } tr:nth-child(even){ background:#fdf6ea; }
+    .container { overflow-x:auto; }
 
-    input.note-input {
-      width: 70%;
-      padding: 6px 10px;
-      border: 1px solid #ccc;
-      border-radius: 8px;
-      outline: none;
-      transition: 0.2s;
-      box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
-    }
-    input.note-input:focus {
-      border-color: #66afe9;
-      box-shadow: 0 0 5px rgba(102,175,233,0.6);
-    }
-    button.note-save {
-      margin-left: 6px;
-      padding: 6px 12px;
-      background-color: #ffc107;
-      color: #333;
-      font-weight: bold;
-      border: none;
-      border-radius: 8px;
-      cursor: pointer;
-      transition: 0.2s;
-    }
-    button.note-save:hover { background-color: #ff9800; }
-    .save-status {
-      display: inline-block;
-      margin-left: 8px;
-      font-size: 13px;
-      color: #28a745;
-      font-weight: bold;
-      transition: opacity 0.3s;
-    }
+    /* ===== 密碼登入門 ===== */
+    #authOverlay{ position:fixed; inset:0; z-index:10000;
+      background:linear-gradient(160deg,#1f2937,#111827);
+      display:flex; align-items:center; justify-content:center; color:#e5e7eb; }
+    .auth-card{ width:min(92vw,420px); background:#111827; border:1px solid #374151;
+      border-radius:16px; padding:22px; }
+    .auth-title{ font-size:18px; margin:0 0 12px; }
+    .auth-row{ display:flex; gap:8px; }
+    .auth-input{ flex:1; padding:10px; border-radius:10px; background:#0b1220; color:#e5e7eb; border:1px solid #334155; }
+    .auth-btn{ padding:10px 14px; border-radius:10px; border:none; background:#60a5fa; cursor:pointer; font-weight:bold; }
+    #authErr{ color:#fca5a5; font-size:13px; margin-top:8px; min-height:18px; }
 
-    .loading-popup {
-      position: fixed; inset: 0;
-      background: rgba(0, 0, 0, 0.3);
-      display: none;
-      justify-content: center;
-      align-items: center;
-      z-index: 9999;
-      font-size: 20px; color: white; font-weight: bold;
-    }
-    .loading-box {
-      background: #333;
-      padding: 20px 40px;
-      border-radius: 12px;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-    }
+    /* ===== 閃電進度條 ===== */
+    #pageLoader{ position:fixed; inset:0; background:#0f172a;
+      display:none; flex-direction:column; justify-content:center; align-items:center;
+      z-index:20000; transition:opacity 1s ease; }
+    #pageLoader.fade-out{ opacity:0; pointer-events:none; }
+    .progress{ position:relative; width:260px; height:14px; border-radius:999px; overflow:hidden; background:rgba(255,255,255,.1);}
+    .progress .layer{ position:absolute; inset:-50% -30%; mix-blend-mode:screen; }
+    .progress .l1{ background:repeating-linear-gradient(-45deg,transparent 0 18px,rgba(255,235,59,.95)18px 22px,transparent 22px 40px);
+      animation:sweepR 1.05s linear infinite; filter:drop-shadow(0 0 6px rgba(255,255,120,.8)); }
+    .progress .l2{ background:repeating-linear-gradient(45deg,transparent 0 18px,rgba(120,200,255,.9)18px 22px,transparent 22px 40px);
+      animation:sweepL 1.25s linear infinite; filter:drop-shadow(0 0 6px rgba(120,200,255,.8)); }
+    .progress .glow{ position:absolute; inset:0; background:radial-gradient(circle,rgba(255,255,255,.25),transparent 70%);}
+    @keyframes sweepR{from{transform:translateX(-20%);}to{transform:translateX(30%);} }
+    @keyframes sweepL{from{transform:translateX(20%);}to{transform:translateX(-30%);} }
+    #pageLoader p{ color:#e5e7eb; margin-top:18px; font-size:15px; font-weight:bold; }
 
-    /* ===== 授權門（密碼輸入） ===== */
-    #authOverlay {
-      position: fixed; inset: 0; z-index: 10000;
-      background: linear-gradient(160deg,#1f2937,#111827);
-      display: flex; align-items: center; justify-content: center;
-      color: #e5e7eb;
-    }
-    .auth-card {
-      width: min(92vw, 420px);
-      background: #111827;
-      border: 1px solid #374151;
-      border-radius: 16px;
-      padding: 22px;
-      box-shadow: 0 10px 30px rgba(0,0,0,.35);
-    }
-    .auth-title { font-size: 18px; margin: 0 0 12px; }
-    .auth-hint { opacity:.85; font-size: 14px; margin-bottom: 12px; }
-    .auth-row { display: flex; gap: 8px; }
-    .auth-input {
-      flex: 1; padding: 10px 12px; border-radius: 10px;
-      background: #0b1220; color: #e5e7eb; border: 1px solid #334155;
-      outline: none; font-size: 16px;
-    }
-    .auth-input:focus { border-color: #60a5fa; box-shadow: 0 0 0 3px rgba(59,130,246,.25); }
-    .auth-btn {
-      padding: 10px 14px; border-radius: 10px; border: none; cursor: pointer;
-      background: #60a5fa; color: #0b1220; font-weight: 700;
-    }
-    .auth-btn:hover { filter: brightness(1.05); }
-    .auth-err { color: #fca5a5; font-size: 13px; min-height: 18px; margin-top: 8px; }
-    .topbar {
-      position: sticky; top: 0; display: flex; justify-content: flex-end; gap: 8px;
-      margin: -8px 0 8px; padding: 8px 0;
-    }
-    .logout-btn {
-      padding: 6px 10px; border-radius: 10px; border: 1px solid #ddd; background: #fff; cursor: pointer;
-    }
+    /* 主系統預設隱藏 */
+    #app{ display:none; }
   </style>
 </head>
 <body>
 
-<!-- ======= 密碼保護門 ======= -->
-<div id="authOverlay" aria-modal="true" role="dialog">
+<!-- 閃電 Loading -->
+<div id="pageLoader">
+  <div class="progress">
+    <span class="layer l1"></span>
+    <span class="layer l2"></span>
+    <span class="glow"></span>
+  </div>
+  <p>⚡ 系統啟動中，請稍候…</p>
+</div>
+
+<!-- 登入門 -->
+<div id="authOverlay">
   <div class="auth-card">
     <h3 class="auth-title">🔐 需要密碼</h3>
-    <p class="auth-hint">請輸入存放在此 HTML 的密碼後進入系統。</p>
     <div class="auth-row">
-      <input id="authInput" class="auth-input" type="password" placeholder="輸入密碼" autocomplete="current-password" />
+      <input id="authInput" class="auth-input" type="password" placeholder="輸入密碼"/>
       <button id="authBtn" class="auth-btn">登入</button>
     </div>
-    <div id="authErr" class="auth-err"></div>
+    <div id="authErr"></div>
   </div>
 </div>
 
-<!-- ======= 主要內容（預設隱藏） ======= -->
-<div id="app" style="display:none;">
-  <div class="topbar">
-    <button id="logoutBtn" class="logout-btn">🚪 登出</button>
-  </div>
-
+<!-- 主系統 -->
+<div id="app">
   <h2>📋 燿華電子台車點檢紀錄總覽</h2>
   <input type="text" id="search" placeholder="🔍 搜尋台車編號、工號、內容…">
-
   <div class="container">
     <table id="recordTable">
       <thead><tr id="tableHead"></tr></thead>
       <tbody id="tableBody"></tbody>
     </table>
   </div>
-
-  <div id="loading" class="loading-popup">
-    <div class="loading-box" id="loading-text">⏳ 載入中…</div>
-  </div>
 </div>
 
 <script>
-  // ========================
-  // 1) 基本密碼設定（明碼）
-  // ========================
-  // ⚠️ 注意：這是前端保護，密碼會被看到，僅適合臨時/內網使用。
-  // 直接修改下方密碼即可：
-  const PLAINTEXT_PASSWORD = "123456"; // ←←← 改成你要的密碼
+const PLAINTEXT_PASSWORD="123456"; 
+const $overlay=document.getElementById('authOverlay');
+const $app=document.getElementById('app');
+const $input=document.getElementById('authInput');
+const $btn=document.getElementById('authBtn');
+const $err=document.getElementById('authErr');
+const loader=document.getElementById("pageLoader");
 
-  // 是否記住登入（以小時計）
-  const REMEMBER_HOURS = 8; // 8 小時內免再次輸入
-  const AUTH_KEY = "ut_cart_admin_authed";
+// ====== GAS URL ======
+const GAS_URL="https://script.google.com/macros/s/AKfycbxBYOrRPbzVUeiZmJHvL17tPHt_lcyvr3R84Op-fY00Owq1ysr1sl-LFBvT-BfL_biTsQ/exec?mode=list";
 
-  function setAuthed(hours) {
-    const expAt = Date.now() + hours * 3600 * 1000;
-    localStorage.setItem(AUTH_KEY, String(expAt));
+// 登入流程
+function tryLogin(){
+  const pw=($input.value||"").trim();
+  if(!pw){ $err.textContent="請輸入密碼"; return; }
+  if(pw===PLAINTEXT_PASSWORD){
+    $overlay.style.display="none";
+    loader.style.display="flex"; // 顯示閃電條
+    initApp(); // 🚀 一邊顯示動畫一邊載入資料
+  } else {
+    $err.textContent="密碼錯誤";
   }
-  function isAuthed() {
-    const v = Number(localStorage.getItem(AUTH_KEY) || 0);
-    return v > Date.now();
-  }
-  function logout() {
-    localStorage.removeItem(AUTH_KEY);
-    document.getElementById('app').style.display = 'none';
-    document.getElementById('authOverlay').style.display = 'flex';
-    document.getElementById('authInput').value = '';
-    document.getElementById('authInput').focus();
-  }
+}
+$btn.addEventListener('click',tryLogin);
+$input.addEventListener('keydown',e=>{if(e.key==="Enter") tryLogin();});
 
-  // 授權流程
-  const $overlay = document.getElementById('authOverlay');
-  const $app = document.getElementById('app');
-  const $input = document.getElementById('authInput');
-  const $btn = document.getElementById('authBtn');
-  const $err = document.getElementById('authErr');
-  const $logout = document.getElementById('logoutBtn');
+// 初始化 & 抓資料
+async function initApp(){
+  try{
+    const res=await fetch(GAS_URL);
+    const data=await res.json();
+    const head=document.getElementById("tableHead");
+    const body=document.getElementById("tableBody");
 
-  function unlockIfAuthed() {
-    if (isAuthed()) {
-      $overlay.style.display = 'none';
-      $app.style.display = '';
-    }
-  }
+    // 建表頭
+    data.headers.forEach(h=>{
+      const th=document.createElement("th"); th.textContent=h; head.appendChild(th);
+    });
 
-  function tryLogin() {
-    const pw = ($input.value || '').trim();
-    if (!pw) {
-      $err.textContent = '請先輸入密碼';
-      return;
-    }
-    if (pw === PLAINTEXT_PASSWORD) {
-      setAuthed(REMEMBER_HOURS);
-      $overlay.style.display = 'none';
-      $app.style.display = '';
-      $err.textContent = '';
-    } else {
-      $err.textContent = '密碼錯誤';
-    }
-  }
-
-  $btn.addEventListener('click', tryLogin);
-  $input.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') tryLogin();
-  });
-  $logout.addEventListener('click', logout);
-
-  // 初次啟動
-  unlockIfAuthed();
-  if ($overlay.style.display !== 'none') $input.focus();
-
-  // ========================
-  // 2) 你的原本業務程式碼
-  // ========================
-  const GAS_URL = "https://script.google.com/macros/s/AKfycbxBYOrRPbzVUeiZmJHvL17tPHt_lcyvr3R84Op-fY00Owq1ysr1sl-LFBvT-BfL_biTsQ/exec?mode=list";
-  const GAS_URL_SAVE = "https://script.google.com/macros/s/AKfycbxBYOrRPbzVUeiZmJHvL17tPHt_lcyvr3R84Op-fY00Owq1ysr1sl-LFBvT-BfL_biTsQ/exec";
-
-  const loading = document.getElementById("loading");
-  const loadingText = document.getElementById("loading-text");
-  const hiddenColumnIndexes = [2, 3]; // 第 3 與第 4 欄隱藏（從 0 起算）
-
-  function showLoading(msg) {
-    loadingText.textContent = msg || "⏳ 載入中…";
-    loading.style.display = "flex";
-  }
-  function hideLoading() { loading.style.display = "none"; }
-
-  // 僅在登入後才抓資料
-  async function initAppAfterAuth() {
-    if (!isAuthed()) return; // 保險
-    showLoading("⏳ 歷史數據資料載入中，請耐心等候，感恩…");
-    try {
-      const res = await fetch(GAS_URL);
-      const data = await res.json();
-      const head = document.getElementById("tableHead");
-      const body = document.getElementById("tableBody");
-
-      // 表頭
-      data.headers.forEach((h, i) => {
-        if (hiddenColumnIndexes.includes(i)) return;
-        const th = document.createElement("th");
-        th.textContent = h;
-        head.appendChild(th);
+    // 建表格內容
+    data.records.forEach(row=>{
+      const tr=document.createElement("tr");
+      row.forEach(cell=>{
+        const td=document.createElement("td");
+        td.textContent=cell||"-"; tr.appendChild(td);
       });
-      const thNote = document.createElement("th");
-      thNote.textContent = "新增備註";
-      head.appendChild(thNote);
+      body.appendChild(tr);
+    });
 
-      // 內容列
-      data.records.forEach(row => {
-        const tr = document.createElement("tr");
-        row.forEach((cell, i) => {
-          if (hiddenColumnIndexes.includes(i)) return;
-          const td = document.createElement("td");
-          td.textContent = cell || "-";
-          tr.appendChild(td);
-        });
-
-        const tdNote = document.createElement("td");
-        const input = document.createElement("input");
-        input.type = "text";
-        input.className = "note-input";
-        input.placeholder = "輸入備註";
-
-        const btn = document.createElement("button");
-        btn.textContent = "儲存";
-        btn.className = "note-save";
-
-        const status = document.createElement("span");
-        status.className = "save-status";
-        status.textContent = "";
-
-        btn.onclick = async () => {
-          const timestamp = row[0];
-          const carId = row[1];
-          const note = input.value;
-          if (!note.trim()) {
-            status.textContent = "請輸入備註";
-            status.style.color = "#dc3545";
-            return;
-          }
-          showLoading("⏳ 備註儲存中，請稍候…");
-          try {
-            const res = await fetch(GAS_URL_SAVE, {
-              method: "POST",
-              headers: { "Content-Type": "application/x-www-form-urlencoded" },
-              body: `mode=note&carId=${encodeURIComponent(carId)}&timestamp=${encodeURIComponent(timestamp)}&note=${encodeURIComponent(note)}`
-            });
-            await res.text();
-            hideLoading();
-            status.textContent = "✅ 已儲存！";
-            status.style.color = "#28a745";
-
-            const allTds = tr.querySelectorAll("td");
-            const noteCell = allTds[allTds.length - 2];
-            noteCell.textContent = note;
-            input.value = "";
-            setTimeout(() => status.textContent = "", 3000);
-          } catch (err) {
-            hideLoading();
-            status.textContent = "❌ 儲存失敗";
-            status.style.color = "#dc3545";
-          }
-        };
-
-        tdNote.appendChild(input);
-        tdNote.appendChild(btn);
-        tdNote.appendChild(status);
-        tr.appendChild(tdNote);
-        body.appendChild(tr);
-      });
-
-      hideLoading();
-
-      // 搜尋
-      document.getElementById("search").addEventListener("input", e => {
-        const keyword = e.target.value.trim().toLowerCase();
-        Array.from(document.getElementById("tableBody").rows).forEach(row => {
-          const match = Array.from(row.cells).some(cell =>
-            cell.textContent.toLowerCase().includes(keyword)
-          );
-          row.style.display = match ? "" : "none";
-        });
-      });
-    } catch (err) {
-      hideLoading();
-      alert("❌ 無法載入資料：" + err.message);
-    }
+    // 全部載完 → 淡出動畫 → 顯示 app
+    setTimeout(()=>{
+      loader.classList.add("fade-out");
+      setTimeout(()=>{
+        loader.style.display="none";
+        $app.style.display="";
+      },1000);
+    },800); // 稍微等動畫跑一下
+  }catch(err){
+    loader.querySelector("p").textContent="❌ 載入失敗："+err.message;
   }
-
-  // 在顯示主要內容後初始化資料（避免未授權也打 GAS）
-  if (isAuthed()) initAppAfterAuth();
-  // 若使用者剛登入成功，覆寫 tryLogin 時會顯示 app，再呼叫此初始化
-  const _origTryLogin = tryLogin;
-  tryLogin = function() {
-    _origTryLogin();
-    if (isAuthed()) initAppAfterAuth();
-  }
+}
 </script>
 
 </body>
