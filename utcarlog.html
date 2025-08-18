@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>📋 燿華台車點檢紀錄總覽</title>
   <style>
+    :root { color-scheme: light; }
     body { font-family:"Segoe UI","Microsoft JhengHei",sans-serif; margin:0; padding:20px; background:#f5faff; }
     h2 { text-align:center; margin-bottom:20px; color:#333; }
     #search { width:100%; max-width:300px; margin:0 auto 16px; display:block;
@@ -14,19 +15,33 @@
     th { background:#ffdd99; } tr:nth-child(even){ background:#fdf6ea; }
     .container { overflow-x:auto; }
 
+    /* ===== 備註欄位樣式 ===== */
+    input.note-input { width: 70%; padding: 6px 10px; border: 1px solid #ccc; border-radius: 8px; outline: none; transition: 0.2s; box-shadow: inset 0 1px 3px rgba(0,0,0,0.1); }
+    input.note-input:focus { border-color: #66afe9; box-shadow: 0 0 5px rgba(102,175,233,0.6); }
+    button.note-save { margin-left: 6px; padding: 6px 12px; background-color: #ffc107; color: #333; font-weight: bold; border: none; border-radius: 8px; cursor: pointer; transition: 0.2s; }
+    button.note-save:hover { background-color: #ff9800; }
+    .save-status { display: inline-block; margin-left: 8px; font-size: 13px; color: #28a745; font-weight: bold; transition: opacity 0.3s; }
+
+    /* ===== 上方工具列 ===== */
+    .topbar { position: sticky; top: 0; display: flex; justify-content: flex-end; gap: 8px; margin: -8px 0 8px; padding: 8px 0; }
+    .logout-btn { padding: 6px 10px; border-radius: 10px; border: 1px solid #ddd; background: #fff; cursor: pointer; }
+
     /* ===== 密碼登入門 ===== */
     #authOverlay{ position:fixed; inset:0; z-index:10000;
       background:linear-gradient(160deg,#1f2937,#111827);
       display:flex; align-items:center; justify-content:center; color:#e5e7eb; }
     .auth-card{ width:min(92vw,420px); background:#111827; border:1px solid #374151;
-      border-radius:16px; padding:22px; }
+      border-radius:16px; padding:22px; box-shadow: 0 10px 30px rgba(0,0,0,.35); }
     .auth-title{ font-size:18px; margin:0 0 12px; }
+    .auth-hint { opacity:.85; font-size: 14px; margin-bottom: 12px; }
     .auth-row{ display:flex; gap:8px; }
-    .auth-input{ flex:1; padding:10px; border-radius:10px; background:#0b1220; color:#e5e7eb; border:1px solid #334155; }
-    .auth-btn{ padding:10px 14px; border-radius:10px; border:none; background:#60a5fa; cursor:pointer; font-weight:bold; }
+    .auth-input{ flex:1; padding:10px 12px; border-radius:10px; background:#0b1220; color:#e5e7eb; border:1px solid #334155; outline:none; font-size:16px; }
+    .auth-input:focus { border-color: #60a5fa; box-shadow: 0 0 0 3px rgba(59,130,246,.25); }
+    .auth-btn{ padding:10px 14px; border-radius:10px; border:none; background:#60a5fa; cursor:pointer; font-weight:700; color:#0b1220; }
+    .auth-btn:hover { filter:brightness(1.05); }
     #authErr{ color:#fca5a5; font-size:13px; margin-top:8px; min-height:18px; }
 
-    /* ===== 閃電進度條 ===== */
+    /* ===== 閃電進度條（載入動畫） ===== */
     #pageLoader{ position:fixed; inset:0; background:#0f172a;
       display:none; flex-direction:column; justify-content:center; align-items:center;
       z-index:20000; transition:opacity 1s ease; }
@@ -40,10 +55,9 @@
     .progress .glow{ position:absolute; inset:0; background:radial-gradient(circle,rgba(255,255,255,.25),transparent 70%);}
     @keyframes sweepR{from{transform:translateX(-20%);}to{transform:translateX(30%);} }
     @keyframes sweepL{from{transform:translateX(20%);}to{transform:translateX(-30%);} }
-
     #pageLoader p{ color:#e5e7eb; margin-top:18px; font-size:15px; font-weight:bold; }
 
-    /* 主系統預設隱藏 */
+    /* 主系統預設隱藏（避免白屏時閃爍） */
     #app{ display:none; }
   </style>
 </head>
@@ -56,15 +70,16 @@
     <span class="layer l2"></span>
     <span class="glow"></span>
   </div>
-  <p>⚡ 連接資料庫中，請稍後，正載入前1000筆數具…</p>
+  <p id="loaderMsg">⚡ 連接資料庫中，請稍候，正載入前 1000 筆數據…</p>
 </div>
 
 <!-- 登入門 -->
-<div id="authOverlay">
+<div id="authOverlay" aria-modal="true" role="dialog">
   <div class="auth-card">
     <h3 class="auth-title">🔐 需要密碼</h3>
+    <p class="auth-hint">請輸入密碼後進入系統（本頁僅前端保護，適合內網）。</p>
     <div class="auth-row">
-      <input id="authInput" class="auth-input" type="password" placeholder="輸入密碼"/>
+      <input id="authInput" class="auth-input" type="password" placeholder="輸入密碼" autocomplete="current-password"/>
       <button id="authBtn" class="auth-btn">登入</button>
     </div>
     <div id="authErr"></div>
@@ -73,6 +88,9 @@
 
 <!-- 主系統 -->
 <div id="app">
+  <div class="topbar">
+    <button id="logoutBtn" class="logout-btn">🚪 登出</button>
+  </div>
   <h2>📋 燿華電子台車點檢紀錄總覽</h2>
   <input type="text" id="search" placeholder="🔍 搜尋台車編號、工號、內容…">
   <div class="container">
@@ -84,86 +102,222 @@
 </div>
 
 <script>
-const PLAINTEXT_PASSWORD="123456"; 
+// ========================
+// 0) 基本密碼設定（前端明碼）
+// ========================
+const PLAINTEXT_PASSWORD = "123456";  // ← 依需求更改
+const REMEMBER_HOURS = 8;              // 8 小時免登
+const AUTH_KEY = "ut_cart_admin_authed";
+function setAuthed(hours){ localStorage.setItem(AUTH_KEY, String(Date.now()+hours*3600*1000)); }
+function isAuthed(){ return Number(localStorage.getItem(AUTH_KEY)||0) > Date.now(); }
+function logout(){
+  localStorage.removeItem(AUTH_KEY);
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('authOverlay').style.display = 'flex';
+  document.getElementById('authInput').value = '';
+  document.getElementById('authInput').focus();
+}
+
+// 元素
 const $overlay=document.getElementById('authOverlay');
 const $app=document.getElementById('app');
 const $input=document.getElementById('authInput');
 const $btn=document.getElementById('authBtn');
 const $err=document.getElementById('authErr');
+const $logout=document.getElementById('logoutBtn');
 const loader=document.getElementById("pageLoader");
+const loaderMsg=document.getElementById("loaderMsg");
 
 // ====== GAS URL ======
 const GAS_URL="https://script.google.com/macros/s/AKfycbxBYOrRPbzVUeiZmJHvL17tPHt_lcyvr3R84Op-fY00Owq1ysr1sl-LFBvT-BfL_biTsQ/exec?mode=list";
+const GAS_URL_SAVE="https://script.google.com/macros/s/AKfycbxBYOrRPbzVUeiZmJHvL17tPHt_lcyvr3R84Op-fY00Owq1ysr1sl-LFBvT-BfL_biTsQ/exec";
 
-// 登入流程
+// 欄位隱藏：第 3 與第 4 欄（0 起算）
+const hiddenColumnIndexes = [2, 3];
+
+// ====== Loader 控制 ======
+function showLoader(msg){
+  if(msg) loaderMsg.textContent = msg;
+  loader.classList.remove("fade-out");
+  loader.style.display="flex";
+}
+function hideLoader(){
+  loader.classList.add("fade-out");
+  setTimeout(()=>{ loader.style.display="none"; }, 800);
+}
+
+// ====== 授權流程 ======
+function unlockIfAuthed(){
+  if(isAuthed()){
+    $overlay.style.display="none";
+    showLoader("⚡ 連接資料庫中，請稍候，正載入前 1000 筆數據…");
+    initAppAfterAuth();
+  }
+}
 function tryLogin(){
   const pw=($input.value||"").trim();
-  if(!pw){ $err.textContent="請輸入密碼"; return; }
+  if(!pw){ $err.textContent="請先輸入密碼"; return; }
   if(pw===PLAINTEXT_PASSWORD){
+    setAuthed(REMEMBER_HOURS);
     $overlay.style.display="none";
-    loader.style.display="flex"; // 顯示閃電條
-    initApp(); // 🚀 一邊顯示動畫一邊載入資料
-  } else {
+    showLoader("⚡ 連接資料庫中，請稍候，正載入前 1000 筆數據…");
+    initAppAfterAuth();
+    $err.textContent="";
+  }else{
     $err.textContent="密碼錯誤";
   }
 }
 $btn.addEventListener('click',tryLogin);
-$input.addEventListener('keydown',e=>{if(e.key==="Enter") tryLogin();});
+$input.addEventListener('keydown',e=>{ if(e.key==="Enter") tryLogin(); });
+$logout.addEventListener('click',logout);
 
-// 初始化 & 抓資料
-async function initApp(){
+// 初次啟動
+unlockIfAuthed();
+if ($overlay.style.display !== 'none') $input.focus();
+
+// ========================
+// 1) 初始化資料（登入後執行）
+// ========================
+async function initAppAfterAuth(){
   try{
     const res=await fetch(GAS_URL);
     if(!res.ok) throw new Error("GAS 回傳非 200：" + res.status);
     const data=await res.json();
-    console.log("📥 GAS 回傳資料:", data);
-
-    const head=document.getElementById("tableHead");
-    const body=document.getElementById("tableBody");
-    head.innerHTML=""; body.innerHTML=""; // 清空舊資料
-
-    if (!data || !data.headers || !data.records) {
-      throw new Error("GAS 回傳格式不正確！");
-    }
-
-    // 建表頭
-    data.headers.forEach(h=>{
-      const th=document.createElement("th"); 
-      th.textContent=h; 
-      head.appendChild(th);
-    });
-
-    // 建表格內容
-    data.records.forEach(row=>{
-      const tr=document.createElement("tr");
-      row.forEach(cell=>{
-        const td=document.createElement("td");
-        td.textContent=cell ?? "-"; 
-        tr.appendChild(td);
-      });
-      body.appendChild(tr);
-    });
-
-    // 資料抓完 → 顯示 app
+    buildTable(data);
+    bindSearch();
+    // 成功載入 → 顯示 app
     setTimeout(()=>{
-      loader.classList.add("fade-out");
-      setTimeout(()=>{
-        loader.style.display="none";
-        $app.style.display="block";   // ✅ 確保 app 顯示（覆蓋 CSS 的 display:none）
-      },1000);
-    },800);
-  } catch(err){
+      hideLoader();
+      $app.style.display="block"; // ✅ 覆蓋 CSS 的 display:none
+    }, 400);
+  }catch(err){
     console.error("載入失敗:", err);
-    // 顯示錯誤、把 loader 關掉，仍讓 app 顯示，避免全白
-    loader.querySelector("p").textContent="❌ 載入失敗："+err.message;
+    loaderMsg.textContent = "❌ 載入失敗：" + err.message;
     setTimeout(()=>{
-      loader.classList.add("fade-out");
-      setTimeout(()=>{
-        loader.style.display="none";
-        $app.style.display="block";   // ✅ 保底顯示 app
-      },800);
-    },600);
+      hideLoader();
+      $app.style.display="block"; // 保底顯示，避免全白
+    }, 800);
   }
+}
+
+// ========================
+// 2) 產生表頭與內容列（含新增備註）
+// ========================
+function buildTable(data){
+  const head=document.getElementById("tableHead");
+  const body=document.getElementById("tableBody");
+  head.innerHTML=""; body.innerHTML="";
+
+  if (!data || !data.headers || !data.records) {
+    throw new Error("GAS 回傳格式不正確！");
+  }
+
+  // 表頭（跳過隱藏欄）
+  data.headers.forEach((h,i)=>{
+    if (hiddenColumnIndexes.includes(i)) return;
+    const th=document.createElement("th");
+    th.textContent=h;
+    head.appendChild(th);
+  });
+  // 額外加入「新增備註」欄
+  const thNote=document.createElement("th");
+  thNote.textContent="新增備註";
+  head.appendChild(thNote);
+
+  // 內容列
+  data.records.forEach(row=>{
+    const tr=document.createElement("tr");
+
+    // 現有資料欄（跳過隱藏欄）
+    row.forEach((cell,i)=>{
+      if (hiddenColumnIndexes.includes(i)) return;
+      const td=document.createElement("td");
+      td.textContent = cell ?? "-";
+      tr.appendChild(td);
+    });
+
+    // 新增備註欄
+    const tdNote=document.createElement("td");
+    const input=document.createElement("input");
+    input.type="text";
+    input.className="note-input";
+    input.placeholder="輸入備註";
+
+    const btn=document.createElement("button");
+    btn.textContent="儲存";
+    btn.className="note-save";
+
+    const status=document.createElement("span");
+    status.className="save-status";
+    status.textContent="";
+
+    btn.onclick = async () => {
+      const timestamp = row[0]; // 你的資料第 1 欄（時間）
+      const carId     = row[1]; // 你的資料第 2 欄（台車編號）
+      const note      = input.value;
+
+      if (!note.trim()){
+        status.textContent = "請輸入備註";
+        status.style.color = "#dc3545";
+        return;
+      }
+
+      showLoader("💾 備註儲存中，請稍候…");
+      try{
+        const res = await fetch(GAS_URL_SAVE, {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: `mode=note&carId=${encodeURIComponent(carId)}&timestamp=${encodeURIComponent(timestamp)}&note=${encodeURIComponent(note)}`
+        });
+        await res.text();
+        hideLoader();
+
+        status.textContent = "✅ 已儲存！";
+        status.style.color = "#28a745";
+
+        // 嘗試把「既有備註欄」更新為最新內容：
+        // 這裡假設「最後一欄是新增備註輸入欄」，所以倒數第二欄為「現有備註」。
+        // 若你的表頭/欄位位置不同，可改成依表頭名稱定位。
+        const allTds = tr.querySelectorAll("td");
+        if (allTds.length >= 2){
+          const noteCell = allTds[allTds.length - 2];
+          // 避免覆蓋不是目標欄位的情況，若你能提供「備註欄」的正確索引/名稱，我可改成更精準的對應。
+          if (noteCell && noteCell !== tdNote) {
+            noteCell.textContent = note;
+          }
+        }
+
+        input.value = "";
+        setTimeout(()=> status.textContent = "", 3000);
+      }catch(err){
+        hideLoader();
+        status.textContent = "❌ 儲存失敗";
+        status.style.color = "#dc3545";
+      }
+    };
+
+    tdNote.appendChild(input);
+    tdNote.appendChild(btn);
+    tdNote.appendChild(status);
+    tr.appendChild(tdNote);
+
+    body.appendChild(tr);
+  });
+}
+
+// ========================
+// 3) 搜尋
+// ========================
+function bindSearch(){
+  document.getElementById("search").addEventListener("input", e=>{
+    const keyword = e.target.value.trim().toLowerCase();
+    Array.from(document.getElementById("tableBody").rows).forEach(row=>{
+      const match = Array.from(row.cells).some(cell =>
+        cell.textContent.toLowerCase().includes(keyword)
+      );
+      row.style.display = match ? "" : "none";
+    });
+  });
 }
 </script>
 
