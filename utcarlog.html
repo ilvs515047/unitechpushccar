@@ -40,6 +40,7 @@
     .progress .glow{ position:absolute; inset:0; background:radial-gradient(circle,rgba(255,255,255,.25),transparent 70%);}
     @keyframes sweepR{from{transform:translateX(-20%);}to{transform:translateX(30%);} }
     @keyframes sweepL{from{transform:translateX(20%);}to{transform:translateX(-30%);} }
+
     #pageLoader p{ color:#e5e7eb; margin-top:18px; font-size:15px; font-weight:bold; }
 
     /* 主系統預設隱藏 */
@@ -113,6 +114,7 @@ $input.addEventListener('keydown',e=>{if(e.key==="Enter") tryLogin();});
 async function initApp(){
   try{
     const res=await fetch(GAS_URL);
+    if(!res.ok) throw new Error("GAS 回傳非 200：" + res.status);
     const data=await res.json();
     console.log("📥 GAS 回傳資料:", data);
 
@@ -136,7 +138,7 @@ async function initApp(){
       const tr=document.createElement("tr");
       row.forEach(cell=>{
         const td=document.createElement("td");
-        td.textContent=cell||"-"; 
+        td.textContent=cell ?? "-"; 
         tr.appendChild(td);
       });
       body.appendChild(tr);
@@ -147,14 +149,20 @@ async function initApp(){
       loader.classList.add("fade-out");
       setTimeout(()=>{
         loader.style.display="none";
-        $app.style.display="";   // 確保 app 顯示
+        $app.style.display="block";   // ✅ 確保 app 顯示（覆蓋 CSS 的 display:none）
       },1000);
     },800);
   } catch(err){
     console.error("載入失敗:", err);
+    // 顯示錯誤、把 loader 關掉，仍讓 app 顯示，避免全白
     loader.querySelector("p").textContent="❌ 載入失敗："+err.message;
-    // 保底顯示 app
-    $app.style.display="";
+    setTimeout(()=>{
+      loader.classList.add("fade-out");
+      setTimeout(()=>{
+        loader.style.display="none";
+        $app.style.display="block";   // ✅ 保底顯示 app
+      },800);
+    },600);
   }
 }
 </script>
