@@ -12,81 +12,32 @@
       padding: 20px;
       margin: 0;
     }
-    h2 {
-      text-align: center;
-      color: #333;
-    }
-    #reader {
-      width: 100%;
-      max-width: 320px;
-      margin: 0 auto 20px;
-    }
+    h2 { text-align: center; color: #333; }
+    #reader { width: 100%; max-width: 320px; margin: 0 auto 20px; }
     #cameraSelect {
-      display: block;
-      margin: 0 auto 10px;
-      padding: 6px;
-      font-size: 14px;
-      width: 100%;
-      max-width: 320px;
+      display: block; margin: 0 auto 10px; padding: 6px; font-size: 14px;
+      width: 100%; max-width: 320px;
     }
-    .status {
-      text-align: center;
-      font-weight: bold;
-      margin-bottom: 10px;
-    }
-    .info {
-      text-align: center;
-      font-size: 15px;
-      margin: 8px 0;
-      color: #444;
-    }
-    .error {
-      color: red;
-      text-align: center;
-      font-weight: bold;
-    }
+    .status { text-align: center; font-weight: bold; margin-bottom: 10px; }
+    .info { text-align: center; font-size: 15px; margin: 8px 0; color: #444; }
+    .error { color: red; text-align: center; font-weight: bold; }
     .card {
-      background-color: white;
-      border-radius: 12px;
+      background-color: white; border-radius: 12px;
       box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-      padding: 16px;
-      margin-bottom: 16px;
+      padding: 16px; margin-bottom: 16px;
     }
-    .card-title {
-      font-weight: bold;
-      color: #555;
-      margin-bottom: 6px;
-    }
-    .card-content {
-      font-size: 15px;
-      color: #222;
-      word-wrap: break-word;
-    }
+    .card-title { font-weight: bold; color: #555; margin-bottom: 6px; }
+    .card-content { font-size: 15px; color: #222; word-wrap: break-word; }
     button {
-      width: 100%;
-      padding: 12px;
-      background-color: #007bff;
-      color: white;
-      border: none;
-      font-size: 16px;
-      border-radius: 8px;
-      cursor: pointer;
-      margin-top: 12px;
+      width: 100%; padding: 12px; background-color: #007bff; color: white;
+      border: none; font-size: 16px; border-radius: 8px; cursor: pointer; margin-top: 12px;
     }
-    button:hover {
-      background-color: #0056b3;
-    }
+    button:hover { background-color: #0056b3; }
     #loadingOverlay {
-      display: flex;
-      position: fixed;
-      top: 0; left: 0;
-      width: 100%; height: 100%;
-      background: rgba(0, 0, 0, 0.4);
-      color: white;
-      font-size: 20px;
-      justify-content: center;
-      align-items: center;
-      z-index: 999;
+      display: flex; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0, 0, 0, 0.4); color: white; font-size: 20px;
+      justify-content: center; align-items: center; z-index: 999;
+      text-align:center; padding: 0 16px;
     }
   </style>
 </head>
@@ -98,14 +49,61 @@
 <p id="carIdDisplay" class="status">📷 等待掃描 QR Code...</p>
 <div id="resultArea"></div>
 <button id="rescanBtn" style="display:none;">🔄 重新掃描</button>
-<div id="loadingOverlay">👌 資料庫載入中，等等喔，會花點時間，但可以快速查詢大量台車，等待是值得的!</div>
+<div id="loadingOverlay">👌 資料庫載入中（只抓今天往前一年的資料）…</div>
 
 <script>
+  // ===== 基本設定 =====
   const GAS_URL = "https://script.google.com/macros/s/AKfycbyqPEMYcuv3idN9icLCSgIrz7OiPbhVFDQwXcyW8j_Y1iK0FENbjEv-74CHsycONrznqA/exec";
   let allRecords = [];
   let scannedCarId = "";
   let currentCameraId = null;
   const qrScanner = new Html5Qrcode("reader");
+
+  // ===== 日期工具：今天與「今天往前一年」 =====
+  function todayYMD(){
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth()+1).padStart(2,'0');
+    const d = String(now.getDate()).padStart(2,'0');
+    return `${y}-${m}-${d}`;
+  }
+  function minusOneYearSameDay(ymd){
+    const [y,m,d] = ymd.split('-').map(n=>parseInt(n,10));
+    const dt = new Date(y, m-1, d);
+    dt.setFullYear(dt.getFullYear()-1);
+    const yy = dt.getFullYear();
+    const mm = String(dt.getMonth()+1).padStart(2,'0');
+    const dd = String(dt.getDate()).padStart(2,'0');
+    return `${yy}-${mm}-${dd}`;
+  }
+  function startOfDay(ymd){ const [y,m,d]=ymd.split('-').map(Number); return new Date(y,m-1,d,0,0,0,0); }
+  function endOfDay(ymd){ const [y,m,d]=ymd.split('-').map(Number); return new Date(y,m-1,d,23,59,59,999); }
+
+  // 將各種格式的 time 轉 Date；失敗回 null
+  function toDate(val){
+    if (val == null) return null;
+    if (Object.prototype.toString.call(val) === '[object Date]' && !isNaN(val)) return val;
+    const s = String(val).trim();
+    // 常見：YYYY-MM-DD HH:mm:ss 或 YYYY/MM/DD HH:mm
+    const s19 = s.slice(0,19);
+    const norm = s19.replace(/\//g,'-').replace(' ', 'T');
+    const d1 = new Date(norm);
+    if (!isNaN(d1)) return d1;
+    const d2 = new Date(s);
+    return isNaN(d2) ? null : d2;
+  }
+
+  // 前端備援篩選：只保留 [from, until]（含端點）
+  function filterByRange(rawArray, fromYMD, untilYMD){
+    const from = startOfDay(fromYMD).getTime();
+    const until = endOfDay(untilYMD).getTime();
+    return (rawArray || []).filter(r=>{
+      const t = toDate(r.time);
+      if (!t) return false;
+      const ts = t.getTime();
+      return ts >= from && ts <= until;
+    });
+  }
 
   // ✅ 載入攝影機清單
   async function initCameraOptions() {
@@ -183,7 +181,7 @@
     const resultArea = document.getElementById("resultArea");
 
     if (!result) {
-      resultArea.innerHTML = `<p class="error">❌ 查無 ${carId} 的點檢資料</p>`;
+      resultArea.innerHTML = `<p class="error">❌ 查無 ${carId} 的點檢資料（或不在近一年範圍內）</p>`;
       document.getElementById("rescanBtn").style.display = "inline-block";
       return;
     }
@@ -211,16 +209,37 @@
     await restartScanner();
   });
 
-  // ✅ 預載資料 + 啟動流程
+  // ✅ 預載資料（只抓今天往前一年）
   async function preloadDataAndInit() {
+    const until = todayYMD();
+    const from  = minusOneYearSameDay(until); // 含端點：from 00:00:00 ~ until 23:59:59
+    const overlay = document.getElementById("loadingOverlay");
     try {
-      const res = await fetch(`${GAS_URL}?mode=list`);
+      // 1) 嘗試由後端做區間過濾（建議日後支援）
+      const res = await fetch(`${GAS_URL}?mode=list&from=${encodeURIComponent(from)}&until=${encodeURIComponent(until)}`, { cache: "no-store" });
+      if (!res.ok) throw new Error("GAS 回傳非 200：" + res.status);
       const data = await res.json();
-      allRecords = data.records || [];
-      document.getElementById("loadingOverlay").style.display = "none";
+
+      // 2) 保險：若後端未支援 from/until，這裡以 time 欄位做前端區間過濾
+      const raw = data.records || [];
+      allRecords = filterByRange(raw, from, until);
+
+      overlay.style.display = "none";
       await initCameraOptions();
     } catch (err) {
-      document.getElementById("loadingOverlay").innerText = "❌ 載入資料失敗：" + err.message;
+      // 若整個請求失敗，再嘗試抓舊 API（無範圍），然後前端過濾
+      overlay.textContent = "⚠️ 後端區間請求失敗，改用前端篩選…";
+      try {
+        const res2 = await fetch(`${GAS_URL}?mode=list`, { cache: "no-store" });
+        if (!res2.ok) throw new Error("GAS 回傳非 200：" + res2.status);
+        const data2 = await res2.json();
+        const raw2 = data2.records || [];
+        allRecords = filterByRange(raw2, from, until);
+        overlay.style.display = "none";
+        await initCameraOptions();
+      } catch (err2) {
+        overlay.textContent = "❌ 載入資料失敗：" + err2.message;
+      }
     }
   }
 
