@@ -23,23 +23,19 @@
     button.note-save:hover { background-color: #ff9800; }
     .save-status { display: inline-block; margin-left: 8px; font-size: 13px; color: #28a745; font-weight: bold; transition: opacity 0.3s; }
 
-    /* ===== 上方工具列（加了年份選取） ===== */
+    /* ===== 上方工具列（加了日期選擇器） ===== */
     .topbar-wrap { position: sticky; top: 0; z-index: 5; background: #f5faff; padding-bottom: 8px; }
     .topbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: -8px 0 8px; padding: 8px 0; }
     .logout-btn { padding: 6px 10px; border-radius: 10px; border: 1px solid #ddd; background: #fff; cursor: pointer; }
 
-    .year-picker{
+    .date-picker{
       display:flex; align-items:center; gap:8px;
       background:#fff; border:1px solid #ddd; padding:6px 10px; border-radius:10px;
       box-shadow: 0 3px 10px rgba(0,0,0,.06);
     }
-    .year-picker label{ font-size:14px; color:#333; white-space:nowrap; }
-    .year-select{
-      appearance:none; -webkit-appearance:none; -moz-appearance:none;
-      padding:6px 28px 6px 10px; border:1px solid #ccc; border-radius:8px; font-size:14px; background:#fff;
-      background-image: linear-gradient(45deg, transparent 50%, #888 50%), linear-gradient(135deg, #888 50%, transparent 50%);
-      background-position: calc(100% - 18px) 55%, calc(100% - 12px) 55%;
-      background-size: 6px 6px, 6px 6px; background-repeat: no-repeat;
+    .date-picker label{ font-size:14px; color:#333; white-space:nowrap; }
+    .date-input{
+      padding:6px 10px; border:1px solid #ccc; border-radius:8px; font-size:14px; background:#fff;
     }
 
     /* ===== 密碼登入門 ===== */
@@ -124,9 +120,10 @@
 <div id="app">
   <div class="topbar-wrap">
     <div class="topbar">
-      <div class="year-picker">
-        <label for="yearSelect">📅 年份</label>
-        <select id="yearSelect" class="year-select" title="選擇年份"></select>
+      <div class="date-picker">
+        <label for="datePicker">📆 截止日期</label>
+        <input id="datePicker" class="date-input" type="date" />
+        <button id="dateLoadBtn" class="logout-btn" style="border-color:#ccc">載入</button>
       </div>
       <button id="logoutBtn" class="logout-btn">🚪 登出</button>
     </div>
@@ -181,7 +178,8 @@ const loaderMsg=document.getElementById("loaderMsg");
 const $fabWrap=document.getElementById("fabWrap");
 const $batchBtn=document.getElementById("batchBtn");
 const $batchCount=document.getElementById("batchCount");
-const $yearSelect=document.getElementById("yearSelect");
+const $datePicker=document.getElementById("datePicker");
+const $dateLoadBtn=document.getElementById("dateLoadBtn");
 
 // ====== GAS URL ======
 const GAS_URL="https://script.google.com/macros/s/AKfycbxBYOrRPbzVUeiZmJHvL17tPHt_lcyvr3R84Op-fY00Owq1ysr1sl-LFBvT-BfL_biTsQ/exec?mode=list";
@@ -257,38 +255,34 @@ function writeNoteBackToRow(inputEl, noteText){
 }
 $batchBtn.addEventListener('click', batchUpdateNotes);
 
-// ====== 年份選取：初始化與變更 ======
-function thisYear(){ return new Date().getFullYear(); }
-function initYearOptions(){
-  const now = thisYear();
-  // 提供近 6 年（可自行調整），從今年往回
-  const years = Array.from({length:6}, (_,i)=> String(now - i));
-  $yearSelect.innerHTML = years.map(y=>`<option value="${y}">${y} 年</option>`).join('');
-  $yearSelect.value = String(now);
-}
-$yearSelect?.addEventListener('change', ()=>{
-  const y = $yearSelect.value;
-  showLoader(`⚡ 正載入 ${y} 年的資料…`);
-  initAppAfterAuth(); // 會根據選年重新撈取/篩選
+// ====== 日期選擇器：初始化與事件 ======
+function todayISO(){ const d=new Date(); const m=String(d.getMonth()+1).padStart(2,'0'); const day=String(d.getDate()).padStart(2,'0'); return `${d.getFullYear()}-${m}-${day}`; }
+function initDatePicker(){ $datePicker.value = todayISO(); }
+$dateLoadBtn?.addEventListener('click', ()=>{
+  if(!$datePicker.value){ alert('請選擇日期'); return; }
+  const d = $datePicker.value;
+  showLoader(`⚡ 正載入 ${d} 之前的資料…`);
+  initAppAfterAuth();
 });
+$datePicker?.addEventListener('keydown',(e)=>{ if(e.key==='Enter') $dateLoadBtn.click(); });
 
 // ====== 授權流程 ======
-function unlockIfAuthed(){
+async function unlockIfAuthed(){
   if(isAuthed()){
     $overlay.style.display="none";
-    initYearOptions();
-    showLoader(`⚡ 正載入 ${$yearSelect.value} 年的資料…`);
+    initDatePicker();
+    showLoader(`⚡ 正載入 ${$datePicker.value} 之前的資料…`);
     initAppAfterAuth();
   }
 }
-function tryLogin(){
+async function tryLogin(){
   const pw=($input.value||"").trim();
   if(!pw){ $err.textContent="請先輸入密碼"; return; }
   if(pw===PLAINTEXT_PASSWORD){
     setAuthed(REMEMBER_HOURS);
     $overlay.style.display="none";
-    initYearOptions();
-    showLoader(`⚡ 正載入 ${$yearSelect.value} 年的資料…`);
+    initDatePicker();
+    showLoader(`⚡ 正載入 ${$datePicker.value} 之前的資料…`);
     initAppAfterAuth();
     $err.textContent="";
   }else{ $err.textContent="密碼錯誤"; }
@@ -305,16 +299,17 @@ if ($overlay.style.display !== 'none') $input.focus();
 // 1) 初始化資料（登入後執行）
 // ========================
 async function initAppAfterAuth(){
-  const year = ($yearSelect && $yearSelect.value) ? $yearSelect.value : String(thisYear());
+  // 取用戶選的截止日（YYYY-MM-DD）
+  const untilStr = ($datePicker && $datePicker.value) ? $datePicker.value : todayISO();
   try{
-    // 先嘗試用 year 參數請求（若 GAS 支援即回傳精準年份資料）
-    const tryUrl = `${GAS_URL}&year=${encodeURIComponent(year)}`;
+    // 嘗試帶 until 參數請求（若 GAS 支援即回傳截止日前資料）
+    const tryUrl = `${GAS_URL}&until=${encodeURIComponent(untilStr)}`;
     const res=await fetch(tryUrl);
     if(!res.ok) throw new Error("GAS 回傳非 200：" + res.status);
     const raw=await res.json();
 
-    // 後端若未支援 year，raw 可能仍是全量（或前 1000 筆）；這裡做前端安全過濾
-    const data = filterByYear(raw, year);
+    // 保險：若後端未支援 until，這裡用前端時間欄過濾（時間 ≤ 選擇日 23:59:59.999）
+    const data = filterByUntil(raw, untilStr);
 
     buildTable(data);
     bindSearch();
@@ -335,40 +330,49 @@ async function initAppAfterAuth(){
   }
 }
 
-// 依年份過濾資料（若後端已過濾，這步會幾乎 pass-through）
-function filterByYear(apiData, year){
+// ====== 時間解析與截止日過濾 ======
+// 將各種可能的時間格式轉為 Date 物件；失敗回傳 null
+function toDate(val){
+  if (val == null) return null;
+  // Apps Script getValues() 多半給 Date 物件
+  if (Object.prototype.toString.call(val) === '[object Date]' && !isNaN(val)) return val;
+  // 字串：容忍 YYYY/MM/DD 與 YYYY-MM-DD HH:mm:ss 等
+  const s = String(val).trim();
+  // 先抓前 19 碼避免奇怪尾巴
+  const s19 = s.slice(0,19);
+  // 將 / 轉 -，把空白轉 T 以利 Date 解析
+  const norm = s19.replace(/\//g,'-').replace(' ', 'T');
+  const d = new Date(norm);
+  if (!isNaN(d)) return d;
+  // 最後再嘗試原字串
+  const d2 = new Date(s);
+  return isNaN(d2) ? null : d2;
+}
+
+function endOfDayISO(ymd){ // 'YYYY-MM-DD' → 當地 23:59:59.999
+  const [y,m,d] = ymd.split('-').map(n=>parseInt(n,10));
+  const dt = new Date(y, (m-1), d, 23,59,59,999);
+  return dt;
+}
+
+function filterByUntil(apiData, untilYMD){
   if (!apiData || !apiData.headers || !apiData.records) {
     throw new Error("GAS 回傳格式不正確！");
   }
-  // 以 headers 找出「時間」欄位 index；找不到就假設第 0 欄
   const headers = apiData.headers;
+  // 以表頭找出「時間」欄位 index；找不到就假設第 0 欄
   let tsIdx = headers.indexOf('時間');
   if (tsIdx < 0) tsIdx = 0;
 
+  const until = endOfDayISO(untilYMD);
+
   const records = apiData.records.filter(row=>{
-    const ts = row[tsIdx];
-    const y = extractYear(ts);
-    return String(y) === String(year);
+    const dt = toDate(row[tsIdx]);
+    if (!dt) return false;
+    return dt.getTime() <= until.getTime();
   });
 
   return { headers: apiData.headers, records };
-}
-
-// 嘗試從多種格式抽出年份
-function extractYear(ts){
-  if (ts == null) return '';
-  // 若是 Date 物件
-  if (Object.prototype.toString.call(ts) === '[object Date]' && !isNaN(ts)) {
-    return ts.getFullYear();
-  }
-  const s = String(ts).trim();
-  // 常見格式：YYYY-MM-DD HH:mm:ss 或 YYYY/MM/DD ...
-  const m = s.match(/^(\d{4})/);
-  if (m) return Number(m[1]);
-  // 嘗試用 Date 解析
-  const d = new Date(s);
-  if (!isNaN(d)) return d.getFullYear();
-  return '';
 }
 
 // ========================
