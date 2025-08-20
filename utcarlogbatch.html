@@ -7,7 +7,7 @@
   <style>
     :root { color-scheme: light; }
     body { font-family:"Segoe UI","Microsoft JhengHei",sans-serif; margin:0; padding:20px; background:#f5faff; }
-    h2 { text-align:center; margin-bottom:20px; color:#333; }
+    h2 { text-align:center; margin-bottom:12px; color:#333; }
     #search { width:100%; max-width:300px; margin:0 auto 16px; display:block;
       padding:8px 12px; font-size:16px; border-radius:8px; border:1px solid #ccc; }
     table { width:100%; border-collapse:collapse; margin-top:10px; font-size:14px; }
@@ -23,9 +23,24 @@
     button.note-save:hover { background-color: #ff9800; }
     .save-status { display: inline-block; margin-left: 8px; font-size: 13px; color: #28a745; font-weight: bold; transition: opacity 0.3s; }
 
-    /* ===== 上方工具列 ===== */
-    .topbar { position: sticky; top: 0; display: flex; justify-content: flex-end; gap: 8px; margin: -8px 0 8px; padding: 8px 0; }
+    /* ===== 上方工具列（加了年份選取） ===== */
+    .topbar-wrap { position: sticky; top: 0; z-index: 5; background: #f5faff; padding-bottom: 8px; }
+    .topbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: -8px 0 8px; padding: 8px 0; }
     .logout-btn { padding: 6px 10px; border-radius: 10px; border: 1px solid #ddd; background: #fff; cursor: pointer; }
+
+    .year-picker{
+      display:flex; align-items:center; gap:8px;
+      background:#fff; border:1px solid #ddd; padding:6px 10px; border-radius:10px;
+      box-shadow: 0 3px 10px rgba(0,0,0,.06);
+    }
+    .year-picker label{ font-size:14px; color:#333; white-space:nowrap; }
+    .year-select{
+      appearance:none; -webkit-appearance:none; -moz-appearance:none;
+      padding:6px 28px 6px 10px; border:1px solid #ccc; border-radius:8px; font-size:14px; background:#fff;
+      background-image: linear-gradient(45deg, transparent 50%, #888 50%), linear-gradient(135deg, #888 50%, transparent 50%);
+      background-position: calc(100% - 18px) 55%, calc(100% - 12px) 55%;
+      background-size: 6px 6px, 6px 6px; background-repeat: no-repeat;
+    }
 
     /* ===== 密碼登入門 ===== */
     #authOverlay{ position:fixed; inset:0; z-index:10000;
@@ -89,7 +104,7 @@
     <span class="layer l2"></span>
     <span class="glow"></span>
   </div>
-  <p id="loaderMsg">⚡ 連接資料庫中，請稍候，正載入前 1000 筆數據…</p>
+  <p id="loaderMsg">⚡ 連接資料庫中，請稍候，正載入中…</p>
 </div>
 
 <!-- 登入門 -->
@@ -107,9 +122,16 @@
 
 <!-- 主系統 -->
 <div id="app">
-  <div class="topbar">
-    <button id="logoutBtn" class="logout-btn">🚪 登出</button>
+  <div class="topbar-wrap">
+    <div class="topbar">
+      <div class="year-picker">
+        <label for="yearSelect">📅 年份</label>
+        <select id="yearSelect" class="year-select" title="選擇年份"></select>
+      </div>
+      <button id="logoutBtn" class="logout-btn">🚪 登出</button>
+    </div>
   </div>
+
   <h2>📋 燿華電子台車點檢紀錄總覽</h2>
   <input type="text" id="search" placeholder="🔍 搜尋台車編號、工號、內容…">
   <div class="container">
@@ -159,6 +181,7 @@ const loaderMsg=document.getElementById("loaderMsg");
 const $fabWrap=document.getElementById("fabWrap");
 const $batchBtn=document.getElementById("batchBtn");
 const $batchCount=document.getElementById("batchCount");
+const $yearSelect=document.getElementById("yearSelect");
 
 // ====== GAS URL ======
 const GAS_URL="https://script.google.com/macros/s/AKfycbxBYOrRPbzVUeiZmJHvL17tPHt_lcyvr3R84Op-fY00Owq1ysr1sl-LFBvT-BfL_biTsQ/exec?mode=list";
@@ -181,53 +204,29 @@ function hideLoader(){
 // ========================
 // A) 批次待送清單（前端側）
 // ========================
-// key = `${timestamp}__${carId}`
 const pendingMap = new Map();
-
 function makeKey(timestamp, carId){ return `${timestamp}__${carId}`; }
-
-function updateFab(){
-  const n = pendingMap.size;
-  $batchCount.textContent = n;
-  $batchBtn.disabled = n === 0;
-}
-
+function updateFab(){ const n = pendingMap.size; $batchCount.textContent = n; $batchBtn.disabled = n === 0; }
 function markPending(inputEl){
   const ts = inputEl.dataset.timestamp;
   const car = inputEl.dataset.carid;
   const note = inputEl.value.trim();
   const key = makeKey(ts, car);
-
-  // 空字串視為不列入待送
-  if(!note){
-    pendingMap.delete(key);
-    inputEl.classList.remove('pending');
-  }else{
-    pendingMap.set(key, { timestamp: ts, carId: car, note, inputEl });
-    inputEl.classList.add('pending');
-  }
+  if(!note){ pendingMap.delete(key); inputEl.classList.remove('pending'); }
+  else { pendingMap.set(key, { timestamp: ts, carId: car, note, inputEl }); inputEl.classList.add('pending'); }
   updateFab();
 }
-
 function clearPendingFor(inputEl){
   const key = makeKey(inputEl.dataset.timestamp, inputEl.dataset.carid);
-  pendingMap.delete(key);
-  inputEl.classList.remove('pending');
-  updateFab();
+  pendingMap.delete(key); inputEl.classList.remove('pending'); updateFab();
 }
-
 async function batchUpdateNotes(){
   if(pendingMap.size===0) return;
-
   const items = Array.from(pendingMap.values());
   showLoader(`💾 批次儲存中 0/${items.length}…`);
-
   let ok=0, fail=0, idx=0;
-
-  // 採「逐筆序列送出」，降低 GAS 端瞬間壓力
   for(const it of items){
-    idx++;
-    loaderMsg.textContent = `💾 批次儲存中 ${idx}/${items.length}…`;
+    idx++; loaderMsg.textContent = `💾 批次儲存中 ${idx}/${items.length}…`;
     try{
       const res = await fetch(GAS_URL_SAVE, {
         method: "POST",
@@ -235,55 +234,50 @@ async function batchUpdateNotes(){
         body: `mode=note&carId=${encodeURIComponent(it.carId)}&timestamp=${encodeURIComponent(it.timestamp)}&note=${encodeURIComponent(it.note)}`
       });
       await res.text();
-
-      // 成功 → 回寫 UI
       writeNoteBackToRow(it.inputEl, it.note);
-      it.inputEl.value = "";        // 清空輸入框
-      it.inputEl.classList.remove('pending');
-      ok++;
+      it.inputEl.value = ""; it.inputEl.classList.remove('pending'); ok++;
     }catch(e){
-      fail++;
-      // 標記失敗紅框提示
-      it.inputEl.style.boxShadow = "0 0 0 3px rgba(220,53,69,.35)";
+      fail++; it.inputEl.style.boxShadow = "0 0 0 3px rgba(220,53,69,.35)";
       setTimeout(()=> it.inputEl.style.boxShadow="", 1200);
     }
-    pendingMap.delete(makeKey(it.timestamp, it.carId));
-    updateFab();
+    pendingMap.delete(makeKey(it.timestamp, it.carId)); updateFab();
   }
-
-  hideLoader();
-  alert(`批次完成：成功 ${ok} 筆，失敗 ${fail} 筆`);
+  hideLoader(); alert(`批次完成：成功 ${ok} 筆，失敗 ${fail} 筆`);
 }
-
 function writeNoteBackToRow(inputEl, noteText){
-  const tr = inputEl.closest("tr");
-  if(!tr) return;
-  // 依你原本邏輯：倒數第二欄是「現有備註」
+  const tr = inputEl.closest("tr"); if(!tr) return;
   const allTds = tr.querySelectorAll("td");
   if (allTds.length >= 2){
     const noteCell = allTds[allTds.length - 2];
     const tdNote = allTds[allTds.length - 1];
-    if (noteCell && noteCell !== tdNote){
-      noteCell.textContent = noteText;
-    }
+    if (noteCell && noteCell !== tdNote){ noteCell.textContent = noteText; }
   }
-  // 若該列也有「單筆儲存」的狀態區，顯示成功
   const status = tr.querySelector(".save-status");
-  if(status){
-    status.textContent = "✅ 已批次儲存！";
-    status.style.color = "#28a745";
-    setTimeout(()=> status.textContent="", 2500);
-  }
+  if(status){ status.textContent = "✅ 已批次儲存！"; status.style.color = "#28a745"; setTimeout(()=> status.textContent="", 2500); }
 }
-
-// 綁定 FAB
 $batchBtn.addEventListener('click', batchUpdateNotes);
+
+// ====== 年份選取：初始化與變更 ======
+function thisYear(){ return new Date().getFullYear(); }
+function initYearOptions(){
+  const now = thisYear();
+  // 提供近 6 年（可自行調整），從今年往回
+  const years = Array.from({length:6}, (_,i)=> String(now - i));
+  $yearSelect.innerHTML = years.map(y=>`<option value="${y}">${y} 年</option>`).join('');
+  $yearSelect.value = String(now);
+}
+$yearSelect?.addEventListener('change', ()=>{
+  const y = $yearSelect.value;
+  showLoader(`⚡ 正載入 ${y} 年的資料…`);
+  initAppAfterAuth(); // 會根據選年重新撈取/篩選
+});
 
 // ====== 授權流程 ======
 function unlockIfAuthed(){
   if(isAuthed()){
     $overlay.style.display="none";
-    showLoader("⚡ 連接資料庫中，請稍候，正載入前 1000 筆數據…");
+    initYearOptions();
+    showLoader(`⚡ 正載入 ${$yearSelect.value} 年的資料…`);
     initAppAfterAuth();
   }
 }
@@ -293,12 +287,11 @@ function tryLogin(){
   if(pw===PLAINTEXT_PASSWORD){
     setAuthed(REMEMBER_HOURS);
     $overlay.style.display="none";
-    showLoader("⚡ 連接資料庫中，請稍候，正載入前 1000 筆數據…");
+    initYearOptions();
+    showLoader(`⚡ 正載入 ${$yearSelect.value} 年的資料…`);
     initAppAfterAuth();
     $err.textContent="";
-  }else{
-    $err.textContent="密碼錯誤";
-  }
+  }else{ $err.textContent="密碼錯誤"; }
 }
 $btn.addEventListener('click',tryLogin);
 $input.addEventListener('keydown',e=>{ if(e.key==="Enter") tryLogin(); });
@@ -312,18 +305,25 @@ if ($overlay.style.display !== 'none') $input.focus();
 // 1) 初始化資料（登入後執行）
 // ========================
 async function initAppAfterAuth(){
+  const year = ($yearSelect && $yearSelect.value) ? $yearSelect.value : String(thisYear());
   try{
-    const res=await fetch(GAS_URL);
+    // 先嘗試用 year 參數請求（若 GAS 支援即回傳精準年份資料）
+    const tryUrl = `${GAS_URL}&year=${encodeURIComponent(year)}`;
+    const res=await fetch(tryUrl);
     if(!res.ok) throw new Error("GAS 回傳非 200：" + res.status);
-    const data=await res.json();
+    const raw=await res.json();
+
+    // 後端若未支援 year，raw 可能仍是全量（或前 1000 筆）；這裡做前端安全過濾
+    const data = filterByYear(raw, year);
+
     buildTable(data);
     bindSearch();
-    // 成功載入 → 顯示 app 與 FAB
+
     setTimeout(()=>{
       hideLoader();
       $app.style.display="block";
       $fabWrap.style.display="flex";
-    }, 400);
+    }, 300);
   }catch(err){
     console.error("載入失敗:", err);
     loaderMsg.textContent = "❌ 載入失敗：" + err.message;
@@ -333,6 +333,42 @@ async function initAppAfterAuth(){
       $fabWrap.style.display="flex";
     }, 800);
   }
+}
+
+// 依年份過濾資料（若後端已過濾，這步會幾乎 pass-through）
+function filterByYear(apiData, year){
+  if (!apiData || !apiData.headers || !apiData.records) {
+    throw new Error("GAS 回傳格式不正確！");
+  }
+  // 以 headers 找出「時間」欄位 index；找不到就假設第 0 欄
+  const headers = apiData.headers;
+  let tsIdx = headers.indexOf('時間');
+  if (tsIdx < 0) tsIdx = 0;
+
+  const records = apiData.records.filter(row=>{
+    const ts = row[tsIdx];
+    const y = extractYear(ts);
+    return String(y) === String(year);
+  });
+
+  return { headers: apiData.headers, records };
+}
+
+// 嘗試從多種格式抽出年份
+function extractYear(ts){
+  if (ts == null) return '';
+  // 若是 Date 物件
+  if (Object.prototype.toString.call(ts) === '[object Date]' && !isNaN(ts)) {
+    return ts.getFullYear();
+  }
+  const s = String(ts).trim();
+  // 常見格式：YYYY-MM-DD HH:mm:ss 或 YYYY/MM/DD ...
+  const m = s.match(/^(\d{4})/);
+  if (m) return Number(m[1]);
+  // 嘗試用 Date 解析
+  const d = new Date(s);
+  if (!isNaN(d)) return d.getFullYear();
+  return '';
 }
 
 // ========================
@@ -378,9 +414,9 @@ function buildTable(data){
     input.className="note-input";
     input.placeholder="輸入備註";
 
-    // 設置鍵（便於批次）
-    const timestamp = row[0]; // 第 1 欄（時間）
-    const carId     = row[1]; // 第 2 欄（台車編號）
+    // 設置鍵（便於批次）—依你原本邏輯：row[0]=時間，row[1]=台車編號
+    const timestamp = row[0];
+    const carId     = row[1];
     input.dataset.timestamp = timestamp;
     input.dataset.carid = carId;
 
