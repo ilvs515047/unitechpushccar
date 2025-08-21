@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>UT台車點檢紀錄查詢（快取版）</title>
+  <title>UT台車點檢紀錄查詢（快速查閱）</title>
   <script src="https://unpkg.com/html5-qrcode"></script>
   <style>
     body {
@@ -43,13 +43,13 @@
 </head>
 <body>
 
-<h2>📋 UT燿華台車點檢紀錄查詢（快取版）</h2>
+<h2>📋 UT燿華台車點檢紀錄查詢（最下方按鈕可以再次查詢，不用重新載資料）</h2>
 <select id="cameraSelect"></select>
 <div id="reader"></div>
 <p id="carIdDisplay" class="status">📷 等待掃描 QR Code...</p>
 <div id="resultArea"></div>
 <button id="rescanBtn" style="display:none;">🔄 重新掃描</button>
-<div id="loadingOverlay">👌 資料庫載入中（只抓今天往前一年的資料）…</div>
+<div id="loadingOverlay">👌 資料庫載入中，請耐心等待約10秒，感謝（只抓今天往前一年的資料）…</div>
 
 <script>
   // ===== 基本設定 =====
