@@ -15,7 +15,7 @@
     h2 { text-align: center; color: #333; }
     #reader { width: 100%; max-width: 320px; margin: 0 auto 20px; }
     #cameraSelect {
-      display: block; margin: 0 auto 10px; padding: 6px; font-size: 14px;
+      display: none; margin: 0 auto 10px; padding: 6px; font-size: 14px;
       width: 100%; max-width: 320px;
     }
     .status { text-align: center; font-weight: bold; margin-bottom: 10px; }
@@ -44,7 +44,7 @@
 <body>
 
 <h2>📋 UT燿華台車點檢紀錄查詢（快取版）</h2>
-<select id="cameraSelect" style="display: none;"></select>
+<select id="cameraSelect"></select>
 <div id="reader"></div>
 <p id="carIdDisplay" class="status">📷 等待掃描 QR Code...</p>
 <div id="resultArea"></div>
@@ -124,6 +124,9 @@
         select.appendChild(option);
       });
 
+      // 若有多顆鏡頭才顯示下拉
+      select.style.display = devices.length > 1 ? "block" : "none";
+
       currentCameraId = select.value;
       select.addEventListener("change", async () => {
         currentCameraId = select.value;
@@ -157,11 +160,9 @@
         document.getElementById("carIdDisplay").innerText = `🚚 台車編號：${scannedCarId}`;
         qrScanner.stop().then(() => {
           displayResultFromCache(scannedCarId);
-        });
+        }).catch(()=>{ /* 安全忽略 */ });
       },
-      (errorMessage) => {
-        // 可忽略
-      }
+      (/* errorMessage */) => { /* 可忽略連續失敗 */ }
     );
   }
 
@@ -193,7 +194,7 @@
       resultArea.innerHTML += `
         <div class="card">
           <div class="card-title">${key}</div>
-          <div class="card-content">${val || "-"}</div>
+          <div class="card-content">${val ?? "-"}</div>
         </div>
       `;
     }
@@ -215,12 +216,12 @@
     const from  = minusOneYearSameDay(until); // 含端點：from 00:00:00 ~ until 23:59:59
     const overlay = document.getElementById("loadingOverlay");
     try {
-      // 1) 嘗試由後端做區間過濾（建議日後支援）
+      // 1) 後端做區間過濾（若 GAS 已支援）
       const res = await fetch(`${GAS_URL}?mode=list&from=${encodeURIComponent(from)}&until=${encodeURIComponent(until)}`, { cache: "no-store" });
       if (!res.ok) throw new Error("GAS 回傳非 200：" + res.status);
       const data = await res.json();
 
-      // 2) 保險：若後端未支援 from/until，這裡以 time 欄位做前端區間過濾
+      // 2) 保險：後端未支援 from/until 時，前端再篩
       const raw = data.records || [];
       allRecords = filterByRange(raw, from, until);
 
