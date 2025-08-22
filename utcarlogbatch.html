@@ -38,6 +38,20 @@
       padding:6px 10px; border:1px solid #ccc; border-radius:8px; font-size:14px; background:#fff;
     }
 
+    /* ===== 新增：左側直排容器（日期選擇器 + 連結按鈕） ===== */
+    .topbar-left{
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+    }
+    /* 新增：連結按鈕同風格強化 */
+    #linkBtn{
+      background:#2563eb;
+      color:#fff;
+      border:1px solid #1e40af;
+    }
+    #linkBtn:hover{ filter:brightness(1.05); }
+
     /* ===== 密碼登入門 ===== */
     #authOverlay{ position:fixed; inset:0; z-index:10000;
       background:linear-gradient(160deg,#1f2937,#111827);
@@ -120,11 +134,17 @@
 <div id="app">
   <div class="topbar-wrap">
     <div class="topbar">
-      <div class="date-picker">
-        <label for="datePicker">📆 截止日期（往前 1 年）</label>
-        <input id="datePicker" class="date-input" type="date" />
-        <button id="dateLoadBtn" class="logout-btn" style="border-color:#ccc">載入</button>
+      <!-- 新增：左側直排容器 -->
+      <div class="topbar-left">
+        <div class="date-picker">
+          <label for="datePicker">📆 截止日期（往前 1 年）</label>
+          <input id="datePicker" class="date-input" type="date" />
+          <button id="dateLoadBtn" class="logout-btn" style="border-color:#ccc">載入</button>
+        </div>
+        <!-- 新增：同風格連結按鈕（位於日期選擇器下方） -->
+        <button id="linkBtn" class="logout-btn">🔗 前往另一個頁面</button>
       </div>
+
       <button id="logoutBtn" class="logout-btn">🚪 登出</button>
     </div>
   </div>
@@ -180,6 +200,10 @@ const $batchBtn=document.getElementById("batchBtn");
 const $batchCount=document.getElementById("batchCount");
 const $datePicker=document.getElementById("datePicker");
 const $dateLoadBtn=document.getElementById("dateLoadBtn");
+const $linkBtn=document.getElementById("linkBtn");   // ← 新增
+
+// ====== 你要前往的網址（自行填入） ======
+const LINK_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTboNzz0ge1oYtK0586Eg1ODFx2ddxJE7cjNp-nDrsQE_srR7LgXhc427z3ObfB0DGqQjIM00eb6JPX/pubhtml"; // ← TODO: 放入你的目標網址，例如 "https://example.com/your-page"
 
 // ====== GAS URL ======
 const GAS_URL="https://script.google.com/macros/s/AKfycbxBYOrRPbzVUeiZmJHvL17tPHt_lcyvr3R84Op-fY00Owq1ysr1sl-LFBvT-BfL_biTsQ/exec?mode=list";
@@ -258,6 +282,8 @@ $batchBtn.addEventListener('click', batchUpdateNotes);
 // ====== 日期選擇器：初始化與事件 ======
 function todayISO(){ const d=new Date(); const m=String(d.getMonth()+1).padStart(2,'0'); const day=String(d.getDate()).padStart(2,'0'); return `${d.getFullYear()}-${m}-${day}`; }
 function initDatePicker(){ $datePicker.value = todayISO(); }
+const $datePickerEl = $datePicker; // 方便複用
+
 $dateLoadBtn?.addEventListener('click', ()=>{
   if(!$datePicker.value){ alert('請選擇日期'); return; }
   const d = $datePicker.value;
@@ -265,6 +291,19 @@ $dateLoadBtn?.addEventListener('click', ()=>{
   initAppAfterAuth();
 });
 $datePicker?.addEventListener('keydown',(e)=>{ if(e.key==='Enter') $dateLoadBtn.click(); });
+
+// ====== 新增：連結按鈕事件 ======
+$linkBtn?.addEventListener('click', ()=>{
+  if(!LINK_URL){
+    alert('尚未設定連結網址，請在程式碼中的 LINK_URL 填入你的網址。');
+    return;
+  }
+  // 若你希望帶日期區間過去，保留以下參數（可改掉）：
+  const until = ($datePicker && $datePicker.value) ? $datePicker.value : todayISO();
+  const from  = minusOneYearSameDay(until);
+  const url   = `${LINK_URL}?from=${encodeURIComponent(from)}&until=${encodeURIComponent(until)}`;
+  window.open(url, '_blank', 'noopener');
+});
 
 // ====== 授權流程 ======
 async function unlockIfAuthed(){
