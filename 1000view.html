@@ -39,6 +39,47 @@
       justify-content: center; align-items: center; z-index: 999;
       text-align:center; padding: 0 16px;
     }
+
+    /* ===== 綠色「已檢驗」炫彩徽章 ===== */
+    .badge-wrap {
+      display: flex;
+      justify-content: center;
+      margin: 12px 0 4px;
+    }
+    .badge-checked {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 14px;
+      border-radius: 999px;
+      font-weight: 700;
+      letter-spacing: .5px;
+      color: #063b1f;
+      background: linear-gradient(135deg, #4ade80 0%, #22c55e 40%, #16a34a 100%);
+      box-shadow:
+        0 0 0 2px rgba(255,255,255,0.9) inset,
+        0 6px 18px rgba(34,197,94,0.35),
+        0 0 24px rgba(52,211,153,0.45);
+      animation: pulseGlow 1.6s infinite ease-in-out;
+      border: 1px solid rgba(6, 78, 59, 0.25);
+      user-select: none;
+    }
+    .badge-checked svg {
+      width: 18px; height: 18px;
+      filter: drop-shadow(0 1px 0 rgba(255,255,255,0.4));
+    }
+    @keyframes pulseGlow {
+      0%   { transform: translateZ(0) scale(1); box-shadow: 0 0 0 2px rgba(255,255,255,0.9) inset, 0 6px 18px rgba(34,197,94,0.35), 0 0 24px rgba(52,211,153,0.45); }
+      50%  { transform: translateZ(0) scale(1.03); box-shadow: 0 0 0 2px rgba(255,255,255,0.9) inset, 0 10px 26px rgba(34,197,94,0.50), 0 0 36px rgba(52,211,153,0.65); }
+      100% { transform: translateZ(0) scale(1); box-shadow: 0 0 0 2px rgba(255,255,255,0.9) inset, 0 6px 18px rgba(34,197,94,0.35), 0 0 24px rgba(52,211,153,0.45); }
+    }
+    .date-row {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      margin: 8px 0 12px;
+    }
   </style>
 </head>
 <body>
@@ -103,6 +144,17 @@
       const ts = t.getTime();
       return ts >= from && ts <= until;
     });
+  }
+
+  // ✅ 是否在「今天往前的 n 個月」內（含端點）
+  function isWithinLastNMonths(dateVal, n=6){
+    const t = toDate(dateVal);
+    if (!t) return false;
+    const now = new Date();
+    // 產生「今天的時刻」與「n 個月前同日」的區間
+    const from = new Date(now.getFullYear(), now.getMonth() - n, now.getDate(), 0,0,0,0).getTime();
+    const ts = t.getTime();
+    return ts >= from && ts <= now.getTime();
   }
 
   // ✅ 載入攝影機清單
@@ -173,13 +225,14 @@
     await startScanner();
   }
 
-  // ✅ 根據快取資料顯示結果
+  // ✅ 根據快取資料顯示結果（新增「半年內已檢驗徽章」）
   function displayResultFromCache(carId) {
     const matches = allRecords
       .filter(r => r.carId === carId)
       .sort((a, b) => new Date(b.time) - new Date(a.time));
     const result = matches[0];
     const resultArea = document.getElementById("resultArea");
+    resultArea.innerHTML = "";
 
     if (!result) {
       resultArea.innerHTML = `<p class="error">❌ 查無 ${carId} 的點檢資料（或不在近一年範圍內）</p>`;
@@ -187,16 +240,44 @@
       return;
     }
 
-    resultArea.innerHTML = `<div class="info">📅 點檢時間：${result.time}</div>`;
-    const fields = Object.entries(result).filter(([key]) => !['carId', 'time'].includes(key));
+    // 檢查是否在最近半年內
+    const checkedWithin6M = isWithinLastNMonths(result.time, 6);
 
-    for (const [key, val] of fields) {
-      resultArea.innerHTML += `
-        <div class="card">
-          <div class="card-title">${key}</div>
-          <div class="card-content">${val ?? "-"}</div>
+    // 先畫日期列與（若符合）徽章
+    const dateRow = document.createElement("div");
+    dateRow.className = "date-row";
+
+    if (checkedWithin6M) {
+      const badgeWrap = document.createElement("div");
+      badgeWrap.className = "badge-wrap";
+      badgeWrap.innerHTML = `
+        <div class="badge-checked" aria-label="已檢驗（半年內）" title="已檢驗（半年內）">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path fill="#064e3b" d="M9 16.2l-3.5-3.5a1 1 0 10-1.4 1.4l4.2 4.2a1 1 0 001.4 0l9-9a1 1 0 10-1.4-1.4L9 16.2z"/>
+          </svg>
+          <span>已檢驗</span>
         </div>
       `;
+      dateRow.appendChild(badgeWrap);
+    }
+
+    const dateInfo = document.createElement("div");
+    dateInfo.className = "info";
+    dateInfo.textContent = `📅 點檢時間：${result.time}`;
+    dateRow.appendChild(dateInfo);
+
+    resultArea.appendChild(dateRow);
+
+    // 其餘欄位維持原本結構輸出
+    const fields = Object.entries(result).filter(([key]) => !['carId', 'time'].includes(key));
+    for (const [key, val] of fields) {
+      const card = document.createElement("div");
+      card.className = "card";
+      card.innerHTML = `
+        <div class="card-title">${key}</div>
+        <div class="card-content">${val ?? "-"}</div>
+      `;
+      resultArea.appendChild(card);
     }
 
     document.getElementById("rescanBtn").style.display = "inline-block";
