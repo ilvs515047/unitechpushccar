@@ -259,7 +259,7 @@
 
     // 若無資料，顯示錯誤訊息（按鈕已在上面）
     if (!result) {
-      resultArea.innerHTML += `<p class="error">❌ 查無 ${carId} 的點檢資料（或不在近一年範圍內）</p>`;
+      resultArea.innerHTML += `<p class="error">❌ 查無 ${carId} 過去一年的點檢資料</p>`;
       // 綁事件
       document.getElementById("rescanBtn").addEventListener("click", async () => {
         resultArea.innerHTML = "";
