@@ -40,13 +40,13 @@
       text-align:center; padding: 0 16px;
     }
 
-    /* ===== 綠色「已檢驗」炫彩徽章 ===== */
+    /* ====== 徽章樣式 ====== */
     .badge-wrap {
       display: flex;
       justify-content: center;
       margin: 12px 0 4px;
     }
-    .badge-checked {
+    .badge {
       display: inline-flex;
       align-items: center;
       gap: 8px;
@@ -54,25 +54,43 @@
       border-radius: 999px;
       font-weight: 700;
       letter-spacing: .5px;
-      color: #063b1f;
-      background: linear-gradient(135deg, #4ade80 0%, #22c55e 40%, #16a34a 100%);
-      box-shadow:
-        0 0 0 2px rgba(255,255,255,0.9) inset,
-        0 6px 18px rgba(34,197,94,0.35),
-        0 0 24px rgba(52,211,153,0.45);
-      animation: pulseGlow 1.6s infinite ease-in-out;
-      border: 1px solid rgba(6, 78, 59, 0.25);
       user-select: none;
     }
-    .badge-checked svg {
-      width: 18px; height: 18px;
-      filter: drop-shadow(0 1px 0 rgba(255,255,255,0.4));
+    .badge svg { width: 18px; height: 18px; }
+
+    .badge-green {
+      color: #063b1f;
+      background: linear-gradient(135deg, #4ade80 0%, #22c55e 40%, #16a34a 100%);
+      box-shadow: 0 0 0 2px rgba(255,255,255,0.9) inset,
+                  0 6px 18px rgba(34,197,94,0.35),
+                  0 0 24px rgba(52,211,153,0.45);
+      border: 1px solid rgba(6, 78, 59, 0.25);
+      animation: pulseGlowGreen 1.6s infinite ease-in-out;
     }
-    @keyframes pulseGlow {
-      0%   { transform: translateZ(0) scale(1); box-shadow: 0 0 0 2px rgba(255,255,255,0.9) inset, 0 6px 18px rgba(34,197,94,0.35), 0 0 24px rgba(52,211,153,0.45); }
-      50%  { transform: translateZ(0) scale(1.03); box-shadow: 0 0 0 2px rgba(255,255,255,0.9) inset, 0 10px 26px rgba(34,197,94,0.50), 0 0 36px rgba(52,211,153,0.65); }
-      100% { transform: translateZ(0) scale(1); box-shadow: 0 0 0 2px rgba(255,255,255,0.9) inset, 0 6px 18px rgba(34,197,94,0.35), 0 0 24px rgba(52,211,153,0.45); }
+    .badge-green svg { filter: drop-shadow(0 1px 0 rgba(255,255,255,0.4)); fill:#064e3b; }
+
+    .badge-red {
+      color: #7f1d1d;
+      background: linear-gradient(135deg, #f87171 0%, #ef4444 40%, #dc2626 100%);
+      box-shadow: 0 0 0 2px rgba(255,255,255,0.9) inset,
+                  0 6px 18px rgba(239,68,68,0.35),
+                  0 0 24px rgba(239,68,68,0.45);
+      border: 1px solid rgba(127,29,29,0.25);
+      animation: pulseGlowRed 1.6s infinite ease-in-out;
     }
+    .badge-red svg { filter: drop-shadow(0 1px 0 rgba(255,255,255,0.4)); fill:#7f1d1d; }
+
+    @keyframes pulseGlowGreen {
+      0% { transform:scale(1); box-shadow:0 0 0 2px rgba(255,255,255,0.9) inset,0 6px 18px rgba(34,197,94,0.35),0 0 24px rgba(52,211,153,0.45); }
+      50% { transform:scale(1.03); box-shadow:0 0 0 2px rgba(255,255,255,0.9) inset,0 10px 26px rgba(34,197,94,0.50),0 0 36px rgba(52,211,153,0.65); }
+      100%{ transform:scale(1); box-shadow:0 0 0 2px rgba(255,255,255,0.9) inset,0 6px 18px rgba(34,197,94,0.35),0 0 24px rgba(52,211,153,0.45); }
+    }
+    @keyframes pulseGlowRed {
+      0% { transform:scale(1); box-shadow:0 0 0 2px rgba(255,255,255,0.9) inset,0 6px 18px rgba(239,68,68,0.35),0 0 24px rgba(239,68,68,0.45); }
+      50% { transform:scale(1.03); box-shadow:0 0 0 2px rgba(255,255,255,0.9) inset,0 10px 26px rgba(239,68,68,0.50),0 0 36px rgba(239,68,68,0.65); }
+      100%{ transform:scale(1); box-shadow:0 0 0 2px rgba(255,255,255,0.9) inset,0 6px 18px rgba(239,68,68,0.35),0 0 24px rgba(239,68,68,0.45); }
+    }
+
     .date-row {
       display: flex;
       flex-direction: column;
@@ -151,7 +169,7 @@
     const t = toDate(dateVal);
     if (!t) return false;
     const now = new Date();
-    // 產生「今天的時刻」與「n 個月前同日」的區間
+    // 取今日 00:00:00 為下界較直覺，也可直接用 now.getDate() 同日
     const from = new Date(now.getFullYear(), now.getMonth() - n, now.getDate(), 0,0,0,0).getTime();
     const ts = t.getTime();
     return ts >= from && ts <= now.getTime();
@@ -225,7 +243,7 @@
     await startScanner();
   }
 
-  // ✅ 根據快取資料顯示結果（新增「半年內已檢驗徽章」）
+  // ✅ 根據快取資料顯示結果（加入半年內/以上徽章）
   function displayResultFromCache(carId) {
     const matches = allRecords
       .filter(r => r.carId === carId)
@@ -240,44 +258,46 @@
       return;
     }
 
-    // 檢查是否在最近半年內
-    const checkedWithin6M = isWithinLastNMonths(result.time, 6);
+    const within6M = isWithinLastNMonths(result.time, 6);
 
-    // 先畫日期列與（若符合）徽章
-    const dateRow = document.createElement("div");
-    dateRow.className = "date-row";
-
-    if (checkedWithin6M) {
-      const badgeWrap = document.createElement("div");
-      badgeWrap.className = "badge-wrap";
-      badgeWrap.innerHTML = `
-        <div class="badge-checked" aria-label="已檢驗（半年內）" title="已檢驗（半年內）">
+    // 標章列
+    const badgeHTML = within6M
+      ? `
+      <div class="badge-wrap">
+        <div class="badge badge-green" title="已檢驗（半年內）">
           <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path fill="#064e3b" d="M9 16.2l-3.5-3.5a1 1 0 10-1.4 1.4l4.2 4.2a1 1 0 001.4 0l9-9a1 1 0 10-1.4-1.4L9 16.2z"/>
+            <path d="M9 16.2l-3.5-3.5a1 1 0 10-1.4 1.4l4.2 4.2a1 1 0 001.4 0l9-9a1 1 0 10-1.4-1.4L9 16.2z"></path>
           </svg>
           <span>已檢驗</span>
         </div>
-      `;
-      dateRow.appendChild(badgeWrap);
-    }
+      </div>`
+      : `
+      <div class="badge-wrap">
+        <div class="badge badge-red" title="半年以上未點檢">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M6 6l12 12M6 18L18 6" stroke-width="2"></path>
+          </svg>
+          <span>半年以上未點檢</span>
+        </div>
+      </div>`;
 
-    const dateInfo = document.createElement("div");
-    dateInfo.className = "info";
-    dateInfo.textContent = `📅 點檢時間：${result.time}`;
-    dateRow.appendChild(dateInfo);
+    // 日期與徽章
+    resultArea.innerHTML += `
+      <div class="date-row">
+        ${badgeHTML}
+        <div class="info">📅 點檢時間：${result.time}</div>
+      </div>
+    `;
 
-    resultArea.appendChild(dateRow);
-
-    // 其餘欄位維持原本結構輸出
+    // 其餘欄位
     const fields = Object.entries(result).filter(([key]) => !['carId', 'time'].includes(key));
     for (const [key, val] of fields) {
-      const card = document.createElement("div");
-      card.className = "card";
-      card.innerHTML = `
-        <div class="card-title">${key}</div>
-        <div class="card-content">${val ?? "-"}</div>
+      resultArea.innerHTML += `
+        <div class="card">
+          <div class="card-title">${key}</div>
+          <div class="card-content">${val ?? "-"}</div>
+        </div>
       `;
-      resultArea.appendChild(card);
     }
 
     document.getElementById("rescanBtn").style.display = "inline-block";
