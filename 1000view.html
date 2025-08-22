@@ -107,7 +107,7 @@
 <div id="reader"></div>
 <p id="carIdDisplay" class="status">📷 等待掃描 QR Code...</p>
 <div id="resultArea"></div>
-<button id="rescanBtn" style="display:none;">🔄 重新掃描</button>
+<!-- 移除原本固定在底部的按鈕，改為動態插入 -->
 <div id="loadingOverlay">👌 資料庫載入中，請耐心等待約10秒，感謝（只抓今天往前一年的資料）…</div>
 
 <script>
@@ -143,7 +143,6 @@
     if (val == null) return null;
     if (Object.prototype.toString.call(val) === '[object Date]' && !isNaN(val)) return val;
     const s = String(val).trim();
-    // 常見：YYYY-MM-DD HH:mm:ss 或 YYYY/MM/DD HH:mm
     const s19 = s.slice(0,19);
     const norm = s19.replace(/\//g,'-').replace(' ', 'T');
     const d1 = new Date(norm);
@@ -169,7 +168,6 @@
     const t = toDate(dateVal);
     if (!t) return false;
     const now = new Date();
-    // 取今日 00:00:00 為下界較直覺，也可直接用 now.getDate() 同日
     const from = new Date(now.getFullYear(), now.getMonth() - n, now.getDate(), 0,0,0,0).getTime();
     const ts = t.getTime();
     return ts >= from && ts <= now.getTime();
@@ -243,7 +241,7 @@
     await startScanner();
   }
 
-  // ✅ 根據快取資料顯示結果（加入半年內/以上徽章）
+  // ✅ 根據快取資料顯示結果（把「重新掃描」放到日期上方）
   function displayResultFromCache(carId) {
     const matches = allRecords
       .filter(r => r.carId === carId)
@@ -252,15 +250,28 @@
     const resultArea = document.getElementById("resultArea");
     resultArea.innerHTML = "";
 
+    // 先插入「重新掃描」按鈕（在日期上方）
+    resultArea.innerHTML += `
+      <div style="text-align:center; margin-bottom:12px;">
+        <button id="rescanBtn">🔄 重新掃描</button>
+      </div>
+    `;
+
+    // 若無資料，顯示錯誤訊息（按鈕已在上面）
     if (!result) {
-      resultArea.innerHTML = `<p class="error">❌ 查無 ${carId} 的點檢資料（或不在近一年範圍內）</p>`;
-      document.getElementById("rescanBtn").style.display = "inline-block";
+      resultArea.innerHTML += `<p class="error">❌ 查無 ${carId} 的點檢資料（或不在近一年範圍內）</p>`;
+      // 綁事件
+      document.getElementById("rescanBtn").addEventListener("click", async () => {
+        resultArea.innerHTML = "";
+        document.getElementById("carIdDisplay").innerText = "📷 等待重新掃描 QR Code...";
+        await restartScanner();
+      });
       return;
     }
 
     const within6M = isWithinLastNMonths(result.time, 6);
 
-    // 標章列
+    // 徽章
     const badgeHTML = within6M
       ? `
       <div class="badge-wrap">
@@ -281,7 +292,7 @@
         </div>
       </div>`;
 
-    // 日期與徽章
+    // 日期列（按鈕已在上方）
     resultArea.innerHTML += `
       <div class="date-row">
         ${badgeHTML}
@@ -300,36 +311,30 @@
       `;
     }
 
-    document.getElementById("rescanBtn").style.display = "inline-block";
+    // 綁定「重新掃描」事件
+    document.getElementById("rescanBtn").addEventListener("click", async () => {
+      resultArea.innerHTML = "";
+      document.getElementById("carIdDisplay").innerText = "📷 等待重新掃描 QR Code...";
+      await restartScanner();
+    });
   }
-
-  // ✅ 點擊重新掃描
-  document.getElementById("rescanBtn").addEventListener("click", async () => {
-    document.getElementById("resultArea").innerHTML = "";
-    document.getElementById("carIdDisplay").innerText = "📷 等待重新掃描 QR Code...";
-    document.getElementById("rescanBtn").style.display = "none";
-    await restartScanner();
-  });
 
   // ✅ 預載資料（只抓今天往前一年）
   async function preloadDataAndInit() {
     const until = todayYMD();
-    const from  = minusOneYearSameDay(until); // 含端點：from 00:00:00 ~ until 23:59:59
+    const from  = minusOneYearSameDay(until);
     const overlay = document.getElementById("loadingOverlay");
     try {
-      // 1) 後端做區間過濾（若 GAS 已支援）
       const res = await fetch(`${GAS_URL}?mode=list&from=${encodeURIComponent(from)}&until=${encodeURIComponent(until)}`, { cache: "no-store" });
       if (!res.ok) throw new Error("GAS 回傳非 200：" + res.status);
       const data = await res.json();
 
-      // 2) 保險：後端未支援 from/until 時，前端再篩
       const raw = data.records || [];
       allRecords = filterByRange(raw, from, until);
 
       overlay.style.display = "none";
       await initCameraOptions();
     } catch (err) {
-      // 若整個請求失敗，再嘗試抓舊 API（無範圍），然後前端過濾
       overlay.textContent = "⚠️ 後端區間請求失敗，改用前端篩選…";
       try {
         const res2 = await fetch(`${GAS_URL}?mode=list`, { cache: "no-store" });
