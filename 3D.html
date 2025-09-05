@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>手機翻轉觀看 3D 模型</title>
+  <title>手機翻轉觀看 3D 方塊</title>
   <style>
     html, body { height: 100%; margin: 0; background: #fff; color: #111; }
     #app { position: fixed; inset: 0; }
@@ -21,10 +21,8 @@
 
   <script type="module">
     import * as THREE from 'https://unpkg.com/three@0.159.0/build/three.module.js';
-    import { GLTFLoader } from 'https://unpkg.com/three@0.159.0/examples/jsm/loaders/GLTFLoader.js';
     import { DeviceOrientationControls } from 'https://unpkg.com/three@0.159.0/examples/jsm/controls/DeviceOrientationControls.js';
     import { OrbitControls } from 'https://unpkg.com/three@0.159.0/examples/jsm/controls/OrbitControls.js';
-    import { RoomEnvironment } from 'https://unpkg.com/three@0.159.0/examples/jsm/environments/RoomEnvironment.js';
 
     // ======== 基本場景 ========
     const app = document.getElementById('app');
@@ -33,7 +31,6 @@
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setClearColor(0xffffff, 1); // 白底
     renderer.outputColorSpace = THREE.SRGBColorSpace;
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
     app.appendChild(renderer.domElement);
 
     const scene = new THREE.Scene();
@@ -42,39 +39,17 @@
     camera.position.set(0, 0.6, 2.0);
     scene.add(camera);
 
-    // 柔和環境光 + 方向光（讓白底下也有立體感）
-    const hemi = new THREE.HemisphereLight(0xffffff, 0xffffff, 0.6);
-    scene.add(hemi);
+    // 光源
+    scene.add(new THREE.AmbientLight(0xffffff, 0.6));
     const dir1 = new THREE.DirectionalLight(0xffffff, 0.9);
     dir1.position.set(2, 2, 3);
     scene.add(dir1);
 
-    // PBR 友善的室內環境映射（讓金屬/塑料更好看）
-    const pmrem = new THREE.PMREMGenerator(renderer);
-    scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
-
-    // ======== 載入免費 GLB 模型 ========
-    const loader = new GLTFLoader();
-    let model;
-    loader.load(
-      // 來源：Khronos glTF Sample Models（公用免費示例）
-      'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/DamagedHelmet/glTF-Binary/DamagedHelmet.glb',
-      (gltf) => {
-        model = gltf.scene;
-        model.traverse((o) => { if (o.isMesh) { o.castShadow = o.receiveShadow = true; }});
-        // 置中模型
-        const box = new THREE.Box3().setFromObject(model);
-        const center = box.getCenter(new THREE.Vector3());
-        model.position.sub(center);
-        // 適度縮放至視野
-        const size = box.getSize(new THREE.Vector3()).length();
-        const scale = 1.2 / size; // 粗略尺度
-        model.scale.setScalar(Math.max(scale * 20, 1));
-        scene.add(model);
-      },
-      undefined,
-      (err) => console.error('模型載入失敗：', err)
-    );
+    // ======== 建立一個基本立方體 ========
+    const geometry = new THREE.BoxGeometry(1, 1, 1);
+    const material = new THREE.MeshStandardMaterial({ color: 0x0077ff });
+    const cube = new THREE.Mesh(geometry, material);
+    scene.add(cube);
 
     // ======== 控制器：感應器 & 手勢 ========
     const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
@@ -112,7 +87,6 @@
       if (!isMobile) { useOrbit(); return; }
       if (typeof DeviceOrientationEvent === 'undefined') { useOrbit(); return; }
 
-      // iOS 需使用者手勢授權
       if (typeof DeviceOrientationEvent.requestPermission === 'function') {
         overlay.style.display = 'grid';
         permitBtn.onclick = async () => {
@@ -127,7 +101,6 @@
           }
         };
       } else {
-        // Android（或部分瀏覽器），直接啟用
         useGyro();
       }
     }
@@ -151,10 +124,6 @@
       if (orbit && currentMode === 'orbit') orbit.update();
       renderer.render(scene, camera);
     });
-
-    // ======== 小技巧：避免 iOS 請求被當非手勢 ========
-    // 任何點擊都可當作手勢來源：
-    window.addEventListener('touchstart', () => {}, { passive: true });
   </script>
 </body>
 </html>
