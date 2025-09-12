@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="zh-TW">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+  <title>手機前端 OCR：辨識「程式」與「拉料距離」</title>
+  <style>
+    :root { --gap: 12px; }
+    body { font-family: system-ui, -apple-system, "Microsoft JhengHei", Segoe UI, Roboto, Arial, sans-serif; margin: 0; background:#0b0f14; color:#e6edf3; }
+    header { padding: 16px; background: #0f1720; position: sticky; top: 0; z-index: 10; border-bottom: 1px solid #1e293b; }
+    h1 { font-size: 18px; margin: 0 0 6px; }
+    p.note { margin: 0; opacity: .8; font-size: 13px; }
+    main { padding: 16px; display: grid; gap: var(--gap); }
+    .row { display: grid; gap: var(--gap); }
+    @media(min-width: 840px){ .row { grid-template-columns: 1.2fr .8fr; align-items: start; } }
+    .card { background: #0f1720; border: 1px solid #223044; border-radius: 14px; overflow: hidden; box-shadow: 0 8px 24px rgba(0,0,0,.25); }
+    .card h2 { font-size: 15px; margin: 0; padding: 10px 12px; border-bottom: 1px solid #1e293b; background: #0c131d; }
+    .card .content { padding: 12px; }
+    .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    button, select, input[type="number"] { background:#122034; color:#e6edf3; border:1px solid #2a3a52; border-radius:10px; padding:8px 12px; font-size:14px; }
+    button.primary { background:#2563eb; border-color:#2563eb; color:#fff; }
+    button:disabled { opacity:.5; }
+    video, canvas { width: 100%; height: auto; background:#000; border-radius: 10px; border:1px solid #1e293b; }
+    .grid { display: grid; gap: 8px; grid-template-columns: 1fr 1fr; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space: pre-wrap; word-break: break-word; }
+    table { width:100%; border-collapse: collapse; }
+    th, td { border-bottom: 1px dashed #213247; padding: 8px; font-size: 14px; }
+    th { text-align:left; opacity: .9; }
+    .ok { color:#16a34a; }
+    .warn { color:#f59e0b; }
+    .err { color:#ef4444; }
+    .badge { display:inline-block; padding:2px 6px; border-radius:999px; background:#11243c; border:1px solid #24496f; font-size:12px; margin-left:6px; opacity:.9; }
+    .hint { font-size: 12px; opacity: .8; }
+    .overlay { position: relative; }
+    .overlay canvas.overlay-canvas { position:absolute; inset:0; pointer-events:none; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>手機前端 OCR（Tesseract.js）— 擷取「程式」與「拉料距離」</h1>
+    <p class="note">純前端、無上傳。支援中英混合（chi_tra+eng）。建議將機台畫面暫停/放大後再拍攝。</p>
+  </header>
+
+  <main>
+    <div class="row">
+      <section class="card">
+        <h2>相機畫面與擷取</h2>
+        <div class="content">
+          <div class="controls">
+            <select id="cameraSelect" title="選擇鏡頭"></select>
+            <label class="hint">影像寬度(px)：<input id="capW" type="number" min="320" max="1920" step="80" value="960"></label>
+            <label class="hint">二值化閾值(0-255)：<input id="th" type="number" min="0" max="255" step="5" value="190"></label>
+            <button id="btnStart" class="primary">啟用相機</button>
+            <button id="btnShot">擷取影像並 OCR</button>
+          </div>
+          <div class="overlay" style="margin-top:8px;">
+            <video id="v" playsinline muted></video>
+            <canvas id="ov" class="overlay-canvas"></canvas>
+          </div>
+          <div class="grid" style="margin-top:8px;">
+            <div>
+              <h3 style="font-size:13px;margin:6px 0;opacity:.8;">預處理影像（灰階＋二值）</h3>
+              <canvas id="c"></canvas>
+            </div>
+            <div>
+              <h3 style="font-size:13px;margin:6px 0;opacity:.8;">原始擷取</h3>
+              <canvas id="raw"></canvas>
+            </div>
+          </div>
+          <p class="hint">小撇步：將相機對準機台HMI畫面上含有「程式」「拉料距離/長度」的區塊，保持垂直、避免反光與莫耶紋。</p>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>辨識結果</h2>
+        <div class="content">
+          <table>
+            <tr><th>欄位</th><th>解析值</th></tr>
+            <tr><td>程式</td><td id="valProg" class="mono warn">—</td></tr>
+            <tr><td>拉料距離</td><td id="valFeed" class="mono warn">—</td></tr>
+          </table>
+          <div style="margin-top:10px;">
+            <div>狀態：<span id="status" class="badge">就緒</span></div>
+            <details style="margin-top:8px;">
+              <summary>展開原文（OCR 全文）</summary>
+              <pre id="fullText" class="mono" style="font-size:12px; line-height:1.4; overflow:auto; max-height:240px;">(尚未辨識)</pre>
+            </details>
+            <p class="hint">規則：
+              <br>• 程式：匹配 <code>程式[:：]?(代碼)</code> 或 <code>Program</code> 後面的英數字/連字號
+              <br>• 拉料距離：匹配 <code>拉料(距離|長度|送料距離)</code> + 數字 + 選擇性單位（mm/cm）
+            </p>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+  <script>
+    const els = {
+      v: document.getElementById('v'),
+      ov: document.getElementById('ov'),
+      c: document.getElementById('c'),
+      raw: document.getElementById('raw'),
+      cameraSelect: document.getElementById('cameraSelect'),
+      capW: document.getElementById('capW'),
+      th: document.getElementById('th'),
+      btnStart: document.getElementById('btnStart'),
+      btnShot: document.getElementById('btnShot'),
+      valProg: document.getElementById('valProg'),
+      valFeed: document.getElementById('valFeed'),
+      status: document.getElementById('status'),
+      fullText: document.getElementById('fullText'),
+    };
+
+    let stream = null;
+
+    async function listCameras(){
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const vids = devices.filter(d => d.kind === 'videoinput');
+      els.cameraSelect.innerHTML = '';
+      vids.forEach((d,i)=>{
+        const opt = document.createElement('option');
+        opt.value = d.deviceId; opt.textContent = d.label || `鏡頭 ${i+1}`;
+        els.cameraSelect.appendChild(opt);
+      });
+    }
+
+    async function startCamera(){
+      try{
+        if(stream){ stream.getTracks().forEach(t=>t.stop()); }
+        const deviceId = els.cameraSelect.value || undefined;
+        const w = parseInt(els.capW.value)||960;
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { deviceId: deviceId? {exact: deviceId}: undefined, width: { ideal: w }, facingMode: 'environment' },
+          audio: false
+        });
+        els.v.srcObject = stream; await els.v.play();
+        fitOverlay();
+        setStatus('相機啟用中', 'ok');
+      }catch(err){
+        console.error(err);
+        setStatus('相機啟用失敗：'+ err.message, 'err');
+      }
+    }
+
+    function fitOverlay(){
+      const rect = els.v.getBoundingClientRect();
+      els.ov.width = els.v.videoWidth; els.ov.height = els.v.videoHeight;
+      els.ov.style.width = rect.width + 'px';
+      els.ov.style.height = rect.height + 'px';
+    }
+
+    function preprocessAndDraw(){
+      // 將 video 畫面擷取到 raw，再做灰階+二值到 c
+      const vw = els.v.videoWidth, vh = els.v.videoHeight;
+      if(!vw || !vh){ return null; }
+      const raw = els.raw, c = els.c;
+      raw.width = vw; raw.height = vh;
+      const rctx = raw.getContext('2d');
+      rctx.drawImage(els.v, 0, 0, vw, vh);
+
+      c.width = vw; c.height = vh;
+      const ctx = c.getContext('2d');
+      ctx.drawImage(els.v, 0, 0, vw, vh);
+      const img = ctx.getImageData(0,0,vw,vh);
+      const data = img.data; const T = Math.max(0, Math.min(255, parseInt(els.th.value)||190));
+      for(let i=0;i<data.length;i+=4){
+        const r=data[i], g=data[i+1], b=data[i+2];
+        const gray = (r*0.299 + g*0.587 + b*0.114)|0;
+        const bin = gray > T ? 255 : 0;
+        data[i]=data[i+1]=data[i+2]=bin; // 二值化
+      }
+      ctx.putImageData(img,0,0);
+      return { raw, processed: c };
+    }
+
+    function parseFields(text){
+      let prog = null, feed = null;
+      // 程式：中文或英文 Program 之後的代碼（英數底線連字號）
+      const reProg = /(?:程式|程序|Program|Prog)\s*[:：]?\s*([A-Za-z0-9_\-\.]{2,})/i;
+      const m1 = text.match(reProg); if(m1){ prog = m1[1]; }
+      // 拉料距離/長度/送料距離：數字 + 可選小數 + 可選單位
+      const reFeed = /(?:拉料\s*(?:距離|長度)|送料距離)\s*[:：]?\s*([0-9]+(?:\.[0-9]+)?)\s*(mm|公釐|cm|公分)?/i;
+      const m2 = text.match(reFeed); if(m2){ feed = (m2[1] + (m2[2] ? ' ' + m2[2] : '')).trim(); }
+      return { prog, feed };
+    }
+
+    function showFields({prog, feed}){
+      if(prog){ els.valProg.textContent = prog; els.valProg.className = 'mono ok'; } else { els.valProg.textContent = '—'; els.valProg.className = 'mono warn'; }
+      if(feed){ els.valFeed.textContent = feed; els.valFeed.className = 'mono ok'; } else { els.valFeed.textContent = '—'; els.valFeed.className = 'mono warn'; }
+    }
+
+    function setStatus(msg, type='ok'){
+      els.status.textContent = msg;
+      els.status.style.background = type==='ok'?'#0b2e16': type==='warn'?'#3a2e0b':'#3a0b0b';
+      els.status.style.borderColor = type==='ok'?'#166534': type==='warn'?'#a16207':'#b91c1c';
+    }
+
+    function drawBoxes(words, needles){
+      // 在疊加層標示含關鍵字的字框
+      const ctx = els.ov.getContext('2d');
+      ctx.clearRect(0,0,els.ov.width, els.ov.height);
+      ctx.lineWidth = 3; ctx.strokeStyle = '#22d3ee';
+      words.forEach(w=>{
+        const t = (w.text||'').trim();
+        if(!t) return;
+        const hit = needles.some(n => t.includes(n));
+        if(hit){
+          const { x0, y0, x1, y1 } = w.bbox;
+          ctx.strokeRect(x0, y0, x1-x0, y1-y0);
+        }
+      });
+    }
+
+    async function doOCR(){
+      setStatus('影像處理中…', 'warn');
+      const frames = preprocessAndDraw();
+      if(!frames){ setStatus('尚未就緒（請先啟用相機）', 'err'); return; }
+      const { processed, raw } = frames;
+      setStatus('OCR 辨識中（chi_tra+eng）…', 'warn');
+      try{
+        const res = await Tesseract.recognize(processed, 'chi_tra+eng', {
+          // 可視需要顯示進度：logger: m => console.log(m)
+        });
+        const text = (res.data.text||'').replace(/\u0000/g,'').trim();
+        els.fullText.textContent = text || '(無文字)';
+        const fields = parseFields(text);
+        showFields(fields);
+        setStatus('完成辨識', 'ok');
+
+        // 顯示關鍵框
+        const needles = ['程式','程序','Program','Prog','拉料','送料','距離','長度'];
+        drawBoxes(res.data.words||[], needles);
+      }catch(err){
+        console.error(err);
+        setStatus('OCR 失敗：'+ err.message, 'err');
+      }
+    }
+
+    // 事件
+    els.btnStart.addEventListener('click', async ()=>{
+      await listCameras();
+      await startCamera();
+    });
+    els.btnShot.addEventListener('click', doOCR);
+    window.addEventListener('resize', fitOverlay);
+
+    // 初次嘗試拿權限（有些瀏覽器需用戶互動才允許）
+    (async ()=>{ try{ await listCameras(); }catch(e){} })();
+  </script>
+</body>
+</html>
