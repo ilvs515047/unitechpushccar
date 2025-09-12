@@ -3,24 +3,25 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
-  <title>手機相機 + OCR 測試（框選區域）</title>
+  <title>手機相機 + OCR 測試（框選區域修正版）</title>
   <style>
     body { font-family: system-ui, -apple-system, "Microsoft JhengHei", sans-serif; margin: 0; background:#0b0f14; color:#e6edf3; display:flex; flex-direction:column; align-items:center; justify-content:flex-start; height:100vh; padding:20px; }
     header { padding: 16px; text-align:center; }
-    video, canvas { width: 100%; max-width: 480px; background:#000; border-radius: 10px; border:1px solid #1e293b; }
+    video { width: 100%; max-width: 480px; background:#000; border-radius: 10px; border:1px solid #1e293b; }
+    canvas { position:absolute; left:0; top:0; pointer-events:none; }
     button { margin-top:16px; padding:10px 16px; background:#2563eb; border:none; border-radius:8px; color:#fff; font-size:15px; }
     #result { margin-top:16px; padding:12px; background:#111827; border-radius:8px; min-height:40px; width:100%; max-width:480px; font-size:14px; white-space:pre-wrap; }
   </style>
 </head>
 <body>
   <header>
-    <h1>手機相機 + OCR 測試（框選區域）</h1>
+    <h1>手機相機 + OCR 測試（框選區域修正版）</h1>
     <p>顯示相機，並只擷取框框內的區域做 OCR</p>
   </header>
 
-  <div style="position:relative;">
+  <div style="position:relative; display:inline-block;">
     <video id="v" playsinline autoplay></video>
-    <canvas id="overlay" style="position:absolute; left:0; top:0;"></canvas>
+    <canvas id="overlay"></canvas>
   </div>
 
   <button id="btnStart">啟用相機</button>
@@ -47,7 +48,7 @@
         });
         v.srcObject = stream;
         await v.play();
-        fitOverlay();
+        resizeOverlay();
         drawBox();
       }catch(err){
         alert('相機啟用失敗：' + err.message);
@@ -55,7 +56,7 @@
       }
     }
 
-    function fitOverlay(){
+    function resizeOverlay(){
       overlay.width = v.videoWidth;
       overlay.height = v.videoHeight;
       overlay.style.width = v.clientWidth + 'px';
@@ -78,12 +79,11 @@
         result.textContent = '相機尚未準備好';
         return;
       }
-
       // 框框區域
-      const w = overlay.width * 0.6;
-      const h = overlay.height * 0.2;
-      const x = (overlay.width - w)/2;
-      const y = (overlay.height - h)/2;
+      const w = v.videoWidth * 0.6;
+      const h = v.videoHeight * 0.2;
+      const x = (v.videoWidth - w)/2;
+      const y = (v.videoHeight - h)/2;
 
       const canvas = document.createElement('canvas');
       canvas.width = w;
@@ -105,7 +105,12 @@
     btnShot.addEventListener('click', doOCR);
 
     v.addEventListener('loadedmetadata', ()=>{
-      fitOverlay();
+      resizeOverlay();
+      drawBox();
+    });
+
+    window.addEventListener('resize', ()=>{
+      resizeOverlay();
       drawBox();
     });
   </script>
