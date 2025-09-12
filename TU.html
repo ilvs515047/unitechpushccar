@@ -3,26 +3,37 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
-  <title>手機相機測試</title>
+  <title>手機相機 OCR 測試</title>
   <style>
-    body { font-family: system-ui, -apple-system, "Microsoft JhengHei", sans-serif; margin: 0; background:#0b0f14; color:#e6edf3; display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; }
-    header { padding: 16px; text-align:center; }
-    video { width: 100%; max-width: 480px; background:#000; border-radius: 10px; border:1px solid #1e293b; }
+    body { font-family: system-ui, -apple-system, "Microsoft JhengHei", sans-serif; margin: 0; background:#0b0f14; color:#e6edf3; display:flex; flex-direction:column; align-items:center; justify-content:flex-start; padding:20px; }
+    header { padding: 8px; text-align:center; }
+    video, canvas { width: 100%; max-width: 480px; border-radius: 10px; border:1px solid #1e293b; background:#000; }
+    #result { margin-top:16px; padding:12px; background:#111827; border-radius:8px; min-height:40px; width:100%; max-width:480px; font-size:14px; white-space:pre-wrap; }
     button { margin-top:16px; padding:10px 16px; background:#2563eb; border:none; border-radius:8px; color:#fff; font-size:15px; }
   </style>
 </head>
 <body>
   <header>
-    <h1>手機相機測試</h1>
-    <p>點擊按鈕開啟相機（建議用手機開啟，需 HTTPS 或 localhost）</p>
+    <h1>相機 + OCR 測試</h1>
+    <p>對長方形框內的內容進行文字辨識</p>
   </header>
 
-  <video id="v" playsinline autoplay></video>
-  <button id="btnStart">啟用相機</button>
+  <div style="position:relative;">
+    <video id="v" playsinline autoplay></video>
+    <canvas id="overlay" style="position:absolute; left:0; top:0;"></canvas>
+  </div>
 
+  <button id="btnShot">擷取框內文字</button>
+  <div id="result">(尚未辨識)</div>
+
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <script>
     const v = document.getElementById('v');
-    const btn = document.getElementById('btnStart');
+    const overlay = document.getElementById('overlay');
+    const ctx = overlay.getContext('2d');
+    const btn = document.getElementById('btnShot');
+    const result = document.getElementById('result');
+
     let stream = null;
 
     async function startCamera(){
@@ -34,13 +45,61 @@
         });
         v.srcObject = stream;
         await v.play();
+        fitOverlay();
+        drawBox();
       }catch(err){
         alert('相機啟用失敗：' + err.message);
         console.error(err);
       }
     }
 
-    btn.addEventListener('click', startCamera);
+    function fitOverlay(){
+      overlay.width = v.videoWidth;
+      overlay.height = v.videoHeight;
+      overlay.style.width = v.clientWidth + 'px';
+      overlay.style.height = v.clientHeight + 'px';
+    }
+
+    function drawBox(){
+      const w = overlay.width * 0.6;
+      const h = overlay.height * 0.2;
+      const x = (overlay.width - w)/2;
+      const y = (overlay.height - h)/2;
+      ctx.clearRect(0,0,overlay.width,overlay.height);
+      ctx.strokeStyle = 'lime';
+      ctx.lineWidth = 4;
+      ctx.strokeRect(x,y,w,h);
+    }
+
+    async function doOCR(){
+      const w = overlay.width * 0.6;
+      const h = overlay.height * 0.2;
+      const x = (overlay.width - w)/2;
+      const y = (overlay.height - h)/2;
+
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      const cctx = canvas.getContext('2d');
+      cctx.drawImage(v, x, y, w, h, 0, 0, w, h);
+
+      result.textContent = '辨識中…';
+      try{
+        const { data: { text } } = await Tesseract.recognize(canvas, 'chi_tra+eng');
+        result.textContent = text.trim() || '(未偵測到文字)';
+      }catch(err){
+        console.error(err);
+        result.textContent = 'OCR 錯誤：' + err.message;
+      }
+    }
+
+    btn.addEventListener('click', doOCR);
+    v.addEventListener('loadeddata', ()=>{
+      fitOverlay();
+      drawBox();
+    });
+
+    startCamera();
   </script>
 </body>
 </html>
