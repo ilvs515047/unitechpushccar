@@ -1,118 +1,24 @@
-<!doctype html>
-<html lang="zh-TW">
+<!DOCTYPE html>
+<html>
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
-  <title>手機相機 + OCR 測試（框選區域修正版）</title>
-  <style>
-    body { font-family: system-ui, -apple-system, "Microsoft JhengHei", sans-serif; margin: 0; background:#0b0f14; color:#e6edf3; display:flex; flex-direction:column; align-items:center; justify-content:flex-start; height:100vh; padding:20px; }
-    header { padding: 16px; text-align:center; }
-    video { width: 100%; max-width: 480px; background:#000; border-radius: 10px; border:1px solid #1e293b; }
-    canvas { position:absolute; left:0; top:0; pointer-events:none; }
-    button { margin-top:16px; padding:10px 16px; background:#2563eb; border:none; border-radius:8px; color:#fff; font-size:15px; }
-    #result { margin-top:16px; padding:12px; background:#111827; border-radius:8px; min-height:40px; width:100%; max-width:480px; font-size:14px; white-space:pre-wrap; }
-  </style>
+  <meta charset="UTF-8">
+  <title>ANC Demo</title>
 </head>
 <body>
-  <header>
-    <h1>手機相機 + OCR 測試（框選區域修正版）</h1>
-    <p>顯示相機，並只擷取框框內的區域做 OCR</p>
-  </header>
-
-  <div style="position:relative; display:inline-block;">
-    <video id="v" playsinline autoplay></video>
-    <canvas id="overlay"></canvas>
-  </div>
-
-  <button id="btnStart">啟用相機</button>
-  <button id="btnShot">擷取框內文字</button>
-  <div id="result">(尚未辨識)</div>
-
-  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+  <button id="startBtn">Start ANC</button>
   <script>
-    const v = document.getElementById('v');
-    const overlay = document.getElementById('overlay');
-    const ctx = overlay.getContext('2d');
-    const btnStart = document.getElementById('btnStart');
-    const btnShot = document.getElementById('btnShot');
-    const result = document.getElementById('result');
+    let audioCtx;
+    document.getElementById("startBtn").onclick = async () => {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const source = audioCtx.createMediaStreamSource(stream);
 
-    let stream = null;
+      const inverter = audioCtx.createGain();
+      inverter.gain.value = -1;  // 反相
 
-    async function startCamera(){
-      try{
-        if(stream){ stream.getTracks().forEach(t=>t.stop()); }
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'environment' },
-          audio: false
-        });
-        v.srcObject = stream;
-        await v.play();
-        resizeOverlay();
-        drawBox();
-      }catch(err){
-        alert('相機啟用失敗：' + err.message);
-        console.error(err);
-      }
-    }
-
-    function resizeOverlay(){
-      overlay.width = v.videoWidth;
-      overlay.height = v.videoHeight;
-      overlay.style.width = v.clientWidth + 'px';
-      overlay.style.height = v.clientHeight + 'px';
-    }
-
-    function drawBox(){
-      const w = overlay.width * 0.6;
-      const h = overlay.height * 0.2;
-      const x = (overlay.width - w)/2;
-      const y = (overlay.height - h)/2;
-      ctx.clearRect(0,0,overlay.width,overlay.height);
-      ctx.strokeStyle = 'lime';
-      ctx.lineWidth = 4;
-      ctx.strokeRect(x,y,w,h);
-    }
-
-    async function doOCR(){
-      if(!v.videoWidth || !v.videoHeight){
-        result.textContent = '相機尚未準備好';
-        return;
-      }
-      // 框框區域
-      const w = v.videoWidth * 0.6;
-      const h = v.videoHeight * 0.2;
-      const x = (v.videoWidth - w)/2;
-      const y = (v.videoHeight - h)/2;
-
-      const canvas = document.createElement('canvas');
-      canvas.width = w;
-      canvas.height = h;
-      const cctx = canvas.getContext('2d');
-      cctx.drawImage(v, x, y, w, h, 0, 0, w, h);
-
-      result.textContent = '辨識中…';
-      try{
-        const { data: { text } } = await Tesseract.recognize(canvas, 'chi_tra+eng');
-        result.textContent = text.trim() || '(未偵測到文字)';
-      }catch(err){
-        console.error(err);
-        result.textContent = 'OCR 錯誤：' + err.message;
-      }
-    }
-
-    btnStart.addEventListener('click', startCamera);
-    btnShot.addEventListener('click', doOCR);
-
-    v.addEventListener('loadedmetadata', ()=>{
-      resizeOverlay();
-      drawBox();
-    });
-
-    window.addEventListener('resize', ()=>{
-      resizeOverlay();
-      drawBox();
-    });
+      source.connect(inverter).connect(audioCtx.destination);
+      console.log("ANC started");
+    };
   </script>
 </body>
 </html>
