@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>按鈕控制螢幕顏色</title>
+<style>
+  body {
+    margin: 0;
+    font-family: "Microsoft JhengHei", sans-serif;
+    display: flex;
+    height: 100vh;
+  }
+
+  /* 左側按鈕區 */
+  #buttons {
+    width: 25%;
+    background-color: #f0f0f0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border-right: 2px solid #ccc;
+  }
+
+  #buttons button {
+    width: 80%;
+    padding: 15px;
+    margin: 10px 0;
+    font-size: 16px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+  }
+
+  #buttons button:hover {
+    transform: scale(1.05);
+    opacity: 0.9;
+  }
+
+  /* 右側螢幕區 */
+  #screen {
+    width: 75%;
+    background-color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+  }
+</style>
+</head>
+<body>
+
+  <!-- 左側按鈕 -->
+  <div id="buttons">
+    <button style="background-color: #ff7b7b;" onclick="changeColor('#ff7b7b')">紅色</button>
+    <button style="background-color: #7bff91;" onclick="changeColor('#7bff91')">綠色</button>
+    <button style="background-color: #7bc8ff;" onclick="changeColor('#7bc8ff')">藍色</button>
+    <button style="background-color: #ffffff;" onclick="changeColor('white')">還原</button>
+  </div>
+
+  <!-- 右側螢幕 -->
+  <div id="screen">螢幕區域</div>
+
+  <script>
+    function changeColor(color) {
+      const screen = document.getElementById("screen");
+      screen.style.backgroundColor = color;
+    }
+  </script>
+
+</body>
+</html>
