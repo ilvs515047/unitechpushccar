@@ -107,7 +107,6 @@
 </head>
 <body>
 
-<!-- 閃電 Loading -->
 <div id="pageLoader">
   <div class="progress">
     <span class="layer l1"></span>
@@ -117,7 +116,6 @@
   <p id="loaderMsg">⚡ 連接資料庫中，請稍候，正載入中…</p>
 </div>
 
-<!-- 登入門 -->
 <div id="authOverlay" aria-modal="true" role="dialog">
   <div class="auth-card">
     <h3 class="auth-title">🔐 需要密碼</h3>
@@ -130,18 +128,15 @@
   </div>
 </div>
 
-<!-- 主系統 -->
 <div id="app">
   <div class="topbar-wrap">
     <div class="topbar">
-      <!-- 新增：左側直排容器 -->
       <div class="topbar-left">
         <div class="date-picker">
           <label for="datePicker">📆 截止日期（往前 1 年）</label>
           <input id="datePicker" class="date-input" type="date" />
           <button id="dateLoadBtn" class="logout-btn" style="border-color:#ccc">載入</button>
         </div>
-        <!-- 新增：同風格連結按鈕（位於日期選擇器下方） -->
         <button id="linkBtn" class="logout-btn">🔗 檢視全部點檢資料</button>
       </div>
 
@@ -159,7 +154,6 @@
   </div>
 </div>
 
-<!-- 懸浮工具：批次更新備註 -->
 <div class="fab-wrap" id="fabWrap" style="display:none;">
   <div class="fab-hint">編輯多筆備註後，一鍵送出</div>
   <button class="fab" id="batchBtn" disabled>
@@ -170,11 +164,14 @@
 
 <script>
 // ========================
-// 0) 基本密碼設定（前端明碼）
+// 0) 基本密碼設定（改用 Hash 保護）
 // ========================
-const PLAINTEXT_PASSWORD = "123456";  // ← 依需求更改
-const REMEMBER_HOURS = 8;              // 8 小時免登
+// 這是 "123456" 的 SHA-256 雜湊值，別人看原始碼只會看到亂碼
+const HASHED_PASSWORD = "8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92";
+
+const REMEMBER_HOURS = 8;               // 8 小時免登
 const AUTH_KEY = "ut_cart_admin_authed";
+
 function setAuthed(hours){ localStorage.setItem(AUTH_KEY, String(Date.now()+hours*3600*1000)); }
 function isAuthed(){ return Number(localStorage.getItem(AUTH_KEY)||0) > Date.now(); }
 function logout(){
@@ -184,6 +181,14 @@ function logout(){
   document.getElementById('authOverlay').style.display = 'flex';
   document.getElementById('authInput').value = '';
   document.getElementById('authInput').focus();
+}
+
+// 雜湊計算工具函式 (使用瀏覽器內建 Crypto API)
+async function sha256(message) {
+  const msgBuffer = new TextEncoder().encode(message);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
 // 元素
@@ -200,10 +205,10 @@ const $batchBtn=document.getElementById("batchBtn");
 const $batchCount=document.getElementById("batchCount");
 const $datePicker=document.getElementById("datePicker");
 const $dateLoadBtn=document.getElementById("dateLoadBtn");
-const $linkBtn=document.getElementById("linkBtn");   // ← 新增
+const $linkBtn=document.getElementById("linkBtn");
 
 // ====== 你要前往的網址（自行填入） ======
-const LINK_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTboNzz0ge1oYtK0586Eg1ODFx2ddxJE7cjNp-nDrsQE_srR7LgXhc427z3ObfB0DGqQjIM00eb6JPX/pubhtml"; // ← TODO: 放入你的目標網址，例如 "https://example.com/your-page"
+const LINK_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTboNzz0ge1oYtK0586Eg1ODFx2ddxJE7cjNp-nDrsQE_srR7LgXhc427z3ObfB0DGqQjIM00eb6JPX/pubhtml";
 
 // ====== GAS URL ======
 const GAS_URL="https://script.google.com/macros/s/AKfycbxBYOrRPbzVUeiZmJHvL17tPHt_lcyvr3R84Op-fY00Owq1ysr1sl-LFBvT-BfL_biTsQ/exec?mode=list";
@@ -282,7 +287,7 @@ $batchBtn.addEventListener('click', batchUpdateNotes);
 // ====== 日期選擇器：初始化與事件 ======
 function todayISO(){ const d=new Date(); const m=String(d.getMonth()+1).padStart(2,'0'); const day=String(d.getDate()).padStart(2,'0'); return `${d.getFullYear()}-${m}-${day}`; }
 function initDatePicker(){ $datePicker.value = todayISO(); }
-const $datePickerEl = $datePicker; // 方便複用
+const $datePickerEl = $datePicker;
 
 $dateLoadBtn?.addEventListener('click', ()=>{
   if(!$datePicker.value){ alert('請選擇日期'); return; }
@@ -292,20 +297,19 @@ $dateLoadBtn?.addEventListener('click', ()=>{
 });
 $datePicker?.addEventListener('keydown',(e)=>{ if(e.key==='Enter') $dateLoadBtn.click(); });
 
-// ====== 新增：連結按鈕事件 ======
+// ====== 連結按鈕事件 ======
 $linkBtn?.addEventListener('click', ()=>{
   if(!LINK_URL){
     alert('尚未設定連結網址，請在程式碼中的 LINK_URL 填入你的網址。');
     return;
   }
-  // 若你希望帶日期區間過去，保留以下參數（可改掉）：
   const until = ($datePicker && $datePicker.value) ? $datePicker.value : todayISO();
   const from  = minusOneYearSameDay(until);
   const url   = `${LINK_URL}?from=${encodeURIComponent(from)}&until=${encodeURIComponent(until)}`;
   window.open(url, '_blank', 'noopener');
 });
 
-// ====== 授權流程 ======
+// ====== 授權流程（核心修改處） ======
 async function unlockIfAuthed(){
   if(isAuthed()){
     $overlay.style.display="none";
@@ -314,21 +318,35 @@ async function unlockIfAuthed(){
     initAppAfterAuth();
   }
 }
+
+// 登入邏輯：計算輸入的 hash 並比對
 async function tryLogin(){
-  const pw=($input.value||"").trim();
+  const pw = ($input.value||"").trim();
   if(!pw){ $err.textContent="請先輸入密碼"; return; }
-  if(pw===PLAINTEXT_PASSWORD){
-    setAuthed(REMEMBER_HOURS);
-    $overlay.style.display="none";
-    initDatePicker();
-    showLoader(`⚡ 正載入 ${$datePicker.value} 往前 1 年的資料…`);
-    initAppAfterAuth();
-    $err.textContent="";
-  }else{ $err.textContent="密碼錯誤"; }
+  
+  // 顯示一點載入感（雖然 hash 很快）
+  // 計算 hash
+  try {
+    const userHash = await sha256(pw);
+    if(userHash === HASHED_PASSWORD){
+      setAuthed(REMEMBER_HOURS);
+      $overlay.style.display="none";
+      initDatePicker();
+      showLoader(`⚡ 正載入 ${$datePicker.value} 往前 1 年的資料…`);
+      initAppAfterAuth();
+      $err.textContent="";
+    }else{
+      $err.textContent="密碼錯誤";
+    }
+  } catch (e) {
+    console.error(e);
+    $err.textContent = "驗證過程發生錯誤 (瀏覽器環境不支援)";
+  }
 }
-$btn.addEventListener('click',tryLogin);
-$input.addEventListener('keydown',e=>{ if(e.key==="Enter") tryLogin(); });
-$logout.addEventListener('click',logout);
+
+$btn.addEventListener('click', tryLogin);
+$input.addEventListener('keydown', e=>{ if(e.key==="Enter") tryLogin(); });
+$logout.addEventListener('click', logout);
 
 // 初次啟動
 unlockIfAuthed();
@@ -338,17 +356,13 @@ if ($overlay.style.display !== 'none') $input.focus();
 // 1) 初始化資料（登入後執行）
 // ========================
 async function initAppAfterAuth(){
-  // 取用戶選的截止日（YYYY-MM-DD），並算出起始日（往前 1 年，同月同日）
   const untilYMD = ($datePicker && $datePicker.value) ? $datePicker.value : todayISO();
-  const fromYMD  = minusOneYearSameDay(untilYMD); // [from, until] 皆為當地時間
+  const fromYMD  = minusOneYearSameDay(untilYMD);
   try{
-    // 優先嘗試由後端過濾（若 GAS 支援 from/until）
     const tryUrl = `${GAS_URL}&from=${encodeURIComponent(fromYMD)}&until=${encodeURIComponent(untilYMD)}`;
     const res=await fetch(tryUrl);
     if(!res.ok) throw new Error("GAS 回傳非 200：" + res.status);
     const raw=await res.json();
-
-    // 保險：若後端未支援，改由前端用時間欄做區間過濾（包含端點）
     const data = filterByRange(raw, fromYMD, untilYMD);
 
     buildTable(data);
@@ -364,7 +378,7 @@ async function initAppAfterAuth(){
     loaderMsg.textContent = "❌ 載入失敗：" + err.message;
     setTimeout(()=>{
       hideLoader();
-      $app.style.display="block"; // 保底顯示，避免全白
+      $app.style.display="block";
       $fabWrap.style.display="flex";
     }, 800);
   }
@@ -373,7 +387,6 @@ async function initAppAfterAuth(){
 // ====== 區間計算＆時間解析 ======
 function minusOneYearSameDay(ymd){
   const [y,m,d] = ymd.split('-').map(n=>parseInt(n,10));
-  // JS 自動處理 2/29 等情況（例如 2030-02-29 會變 2029-03-01）
   const dt = new Date(y, (m-1), d);
   dt.setFullYear(dt.getFullYear()-1);
   const yy = dt.getFullYear();
@@ -389,7 +402,6 @@ function endOfDay(ymd){
   const [y,m,d] = ymd.split('-').map(n=>parseInt(n,10));
   return new Date(y, m-1, d, 23,59,59,999);
 }
-// 將各種可能的時間格式轉為 Date 物件；失敗回傳 null
 function toDate(val){
   if (val == null) return null;
   if (Object.prototype.toString.call(val) === '[object Date]' && !isNaN(val)) return val;
@@ -401,14 +413,11 @@ function toDate(val){
   const d2 = new Date(s);
   return isNaN(d2) ? null : d2;
 }
-
-// 依 [from, until]（含端點）過濾資料
 function filterByRange(apiData, fromYMD, untilYMD){
   if (!apiData || !apiData.headers || !apiData.records) {
     throw new Error("GAS 回傳格式不正確！");
   }
   const headers = apiData.headers;
-  // 找出「時間」欄位 index；找不到就假設第 0 欄
   let tsIdx = headers.indexOf('時間');
   if (tsIdx < 0) tsIdx = 0;
 
@@ -426,7 +435,7 @@ function filterByRange(apiData, fromYMD, untilYMD){
 }
 
 // ========================
-// 2) 產生表頭與內容列（含新增備註）
+// 2) 產生表頭與內容列
 // ========================
 function buildTable(data){
   const head=document.getElementById("tableHead");
@@ -437,23 +446,19 @@ function buildTable(data){
     throw new Error("GAS 回傳格式不正確！");
   }
 
-  // 表頭（跳過隱藏欄）
   data.headers.forEach((h,i)=>{
     if (hiddenColumnIndexes.includes(i)) return;
     const th=document.createElement("th");
     th.textContent=h;
     head.appendChild(th);
   });
-  // 額外加入「新增備註」欄
   const thNote=document.createElement("th");
   thNote.textContent="新增備註";
   head.appendChild(thNote);
 
-  // 內容列
   data.records.forEach(row=>{
     const tr=document.createElement("tr");
 
-    // 現有資料欄（跳過隱藏欄）
     row.forEach((cell,i)=>{
       if (hiddenColumnIndexes.includes(i)) return;
       const td=document.createElement("td");
@@ -461,20 +466,16 @@ function buildTable(data){
       tr.appendChild(td);
     });
 
-    // 新增備註欄
     const tdNote=document.createElement("td");
     const input=document.createElement("input");
     input.type="text";
     input.className="note-input";
     input.placeholder="輸入備註";
-
-    // 設置鍵（便於批次）—依你原本邏輯：row[0]=時間，row[1]=台車編號
     const timestamp = row[0];
-    const carId     = row[1];
+    const carId       = row[1];
     input.dataset.timestamp = timestamp;
     input.dataset.carid = carId;
 
-    // 只要內容有變動 → 納入待批次
     input.addEventListener('input', ()=> markPending(input));
 
     const btn=document.createElement("button");
@@ -492,7 +493,6 @@ function buildTable(data){
         status.style.color = "#dc3545";
         return;
       }
-
       showLoader("💾 備註儲存中，請稍候…");
       try{
         const res = await fetch(GAS_URL_SAVE, {
@@ -502,14 +502,9 @@ function buildTable(data){
         });
         await res.text();
         hideLoader();
-
         status.textContent = "✅ 已儲存！";
         status.style.color = "#28a745";
-
-        // 回寫到「現有備註」欄
         writeNoteBackToRow(input, note);
-
-        // 單筆成功後，若在待批次清單，移除它
         clearPendingFor(input);
         input.value = "";
         setTimeout(()=> status.textContent = "", 3000);
@@ -524,11 +519,8 @@ function buildTable(data){
     tdNote.appendChild(btn);
     tdNote.appendChild(status);
     tr.appendChild(tdNote);
-
     body.appendChild(tr);
   });
-
-  // 每次重建表格後，刷新 FAB 計數（避免殘留）
   pendingMap.clear();
   updateFab();
 }
