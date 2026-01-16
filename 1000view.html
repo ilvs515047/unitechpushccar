@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>UT台車點檢紀錄查詢（快速查閱）</title>
+  <title>UT台車點檢紀錄查詢（週期制）</title>
   <script src="https://unpkg.com/html5-qrcode"></script>
   <style>
     body {
@@ -41,29 +41,18 @@
     }
 
     /* ====== 徽章樣式 ====== */
-    .badge-wrap {
-      display: flex;
-      justify-content: center;
-      margin: 12px 0 4px;
-    }
+    .badge-wrap { display: flex; justify-content: center; margin: 12px 0 4px; }
     .badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 16px 28px;
-      border-radius: 999px;
-      font-weight: 700;
-      letter-spacing: .5px;
-      user-select: none;
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 16px 28px; border-radius: 999px;
+      font-weight: 700; letter-spacing: .5px; user-select: none;
     }
     .badge svg { width: 18px; height: 18px; }
 
     .badge-green {
       color: #063b1f;
       background: linear-gradient(135deg, #4ade80 0%, #22c55e 40%, #16a34a 100%);
-      box-shadow: 0 0 0 2px rgba(255,255,255,0.9) inset,
-                  0 6px 18px rgba(34,197,94,0.35),
-                  0 0 24px rgba(52,211,153,0.45);
+      box-shadow: 0 0 0 2px rgba(255,255,255,0.9) inset, 0 6px 18px rgba(34,197,94,0.35);
       border: 1px solid rgba(6, 78, 59, 0.25);
       animation: pulseGlowGreen 1.6s infinite ease-in-out;
     }
@@ -72,53 +61,57 @@
     .badge-red {
       color: #7f1d1d;
       background: linear-gradient(135deg, #f87171 0%, #ef4444 40%, #dc2626 100%);
-      box-shadow: 0 0 0 2px rgba(255,255,255,0.9) inset,
-                  0 6px 18px rgba(239,68,68,0.35),
-                  0 0 24px rgba(239,68,68,0.45);
+      box-shadow: 0 0 0 2px rgba(255,255,255,0.9) inset, 0 6px 18px rgba(239,68,68,0.35);
       border: 1px solid rgba(127,29,29,0.25);
       animation: pulseGlowRed 1.6s infinite ease-in-out;
     }
     .badge-red svg { filter: drop-shadow(0 1px 0 rgba(255,255,255,0.4)); fill:#7f1d1d; }
 
     @keyframes pulseGlowGreen {
-      0% { transform:scale(1); box-shadow:0 0 0 2px rgba(255,255,255,0.9) inset,0 6px 18px rgba(34,197,94,0.35),0 0 24px rgba(52,211,153,0.45); }
-      50% { transform:scale(1.03); box-shadow:0 0 0 2px rgba(255,255,255,0.9) inset,0 10px 26px rgba(34,197,94,0.50),0 0 36px rgba(52,211,153,0.65); }
-      100%{ transform:scale(1); box-shadow:0 0 0 2px rgba(255,255,255,0.9) inset,0 6px 18px rgba(34,197,94,0.35),0 0 24px rgba(52,211,153,0.45); }
+      0% { transform:scale(1); } 50% { transform:scale(1.03); } 100%{ transform:scale(1); }
     }
     @keyframes pulseGlowRed {
-      0% { transform:scale(1); box-shadow:0 0 0 2px rgba(255,255,255,0.9) inset,0 6px 18px rgba(239,68,68,0.35),0 0 24px rgba(239,68,68,0.45); }
-      50% { transform:scale(1.03); box-shadow:0 0 0 2px rgba(255,255,255,0.9) inset,0 10px 26px rgba(239,68,68,0.50),0 0 36px rgba(239,68,68,0.65); }
-      100%{ transform:scale(1); box-shadow:0 0 0 2px rgba(255,255,255,0.9) inset,0 6px 18px rgba(239,68,68,0.35),0 0 24px rgba(239,68,68,0.45); }
+      0% { transform:scale(1); } 50% { transform:scale(1.03); } 100%{ transform:scale(1); }
     }
 
     .date-row {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 8px;
-      margin: 8px 0 12px;
+      display: flex; flex-direction: column; align-items: center; gap: 8px; margin: 8px 0 12px;
+    }
+    .rule-info {
+        font-size: 12px; color: #888; text-align: center; margin-bottom: 8px;
     }
   </style>
 </head>
 <body>
 
-<h2>📋 UT燿華台車點檢紀錄查詢</h2>
+<h2>📋 UT燿華台車點檢紀錄</h2>
+<div class="rule-info">檢查規則：必須完成當年度 1月 或 7月 之點檢</div>
+
 <select id="cameraSelect"></select>
 <div id="reader"></div>
 <p id="carIdDisplay" class="status">📷 等待掃描 QR Code...</p>
 <div id="resultArea"></div>
-<!-- 移除原本固定在底部的按鈕，改為動態插入 -->
-<div id="loadingOverlay">👌 資料庫載入中，請耐心等待約10秒，感謝（只抓今天往前一年的資料）…</div>
+<div id="loadingOverlay">👌 資料庫載入中，請耐心等待...</div>
 
 <script>
-  // ===== 基本設定 =====
-  const GAS_URL = "https://script.google.com/macros/s/AKfycbyqPEMYcuv3idN9icLCSgIrz7OiPbhVFDQwXcyW8j_Y1iK0FENbjEv-74CHsycONrznqA/exec";
+  // ==========================================
+  // ⚙️ 設定檔區域 (在此定義檢查月份)
+  // ==========================================
+  const CONFIG = {
+    // 定義這一年當中，哪幾個月份是「檢查月」
+    // 您想要 1月 和 7月，就填入 [1, 7]
+    CHECK_MONTHS: [1, 7], 
+    
+    GAS_URL: "https://script.google.com/macros/s/AKfycbyqPEMYcuv3idN9icLCSgIrz7OiPbhVFDQwXcyW8j_Y1iK0FENbjEv-74CHsycONrznqA/exec"
+  };
+  // ==========================================
+
   let allRecords = [];
   let scannedCarId = "";
   let currentCameraId = null;
   const qrScanner = new Html5Qrcode("reader");
 
-  // ===== 日期工具：今天與「今天往前一年」 =====
+  // 日期工具
   function todayYMD(){
     const now = new Date();
     const y = now.getFullYear();
@@ -126,231 +119,199 @@
     const d = String(now.getDate()).padStart(2,'0');
     return `${y}-${m}-${d}`;
   }
-  function minusOneYearSameDay(ymd){
+  
+  // 為了保險，這裡抓前一年半的資料，避免年初查不到去年底的
+  function minus18Months(ymd){
     const [y,m,d] = ymd.split('-').map(n=>parseInt(n,10));
     const dt = new Date(y, m-1, d);
-    dt.setFullYear(dt.getFullYear()-1);
+    dt.setMonth(dt.getMonth() - 18);
     const yy = dt.getFullYear();
     const mm = String(dt.getMonth()+1).padStart(2,'0');
     const dd = String(dt.getDate()).padStart(2,'0');
     return `${yy}-${mm}-${dd}`;
   }
-  function startOfDay(ymd){ const [y,m,d]=ymd.split('-').map(Number); return new Date(y,m-1,d,0,0,0,0); }
-  function endOfDay(ymd){ const [y,m,d]=ymd.split('-').map(Number); return new Date(y,m-1,d,23,59,59,999); }
-
-  // 將各種格式的 time 轉 Date；失敗回 null
+  
   function toDate(val){
     if (val == null) return null;
     if (Object.prototype.toString.call(val) === '[object Date]' && !isNaN(val)) return val;
-    const s = String(val).trim();
-    const s19 = s.slice(0,19);
-    const norm = s19.replace(/\//g,'-').replace(' ', 'T');
-    const d1 = new Date(norm);
-    if (!isNaN(d1)) return d1;
-    const d2 = new Date(s);
-    return isNaN(d2) ? null : d2;
+    const s = String(val).trim().slice(0,19).replace(/\//g,'-').replace(' ', 'T');
+    const d = new Date(s);
+    return isNaN(d) ? null : d;
   }
 
-  // 前端備援篩選：只保留 [from, until]（含端點）
-  function filterByRange(rawArray, fromYMD, untilYMD){
-    const from = startOfDay(fromYMD).getTime();
-    const until = endOfDay(untilYMD).getTime();
-    return (rawArray || []).filter(r=>{
-      const t = toDate(r.time);
-      if (!t) return false;
-      const ts = t.getTime();
-      return ts >= from && ts <= until;
-    });
-  }
+  // ✅ 核心新邏輯：檢查是否符合「當期月份」
+  function checkPeriodicStatus(recordDateVal) {
+    const recordDate = toDate(recordDateVal);
+    if (!recordDate) return { isOk: false, msg: "無有效日期" };
 
-  // ✅ 是否在「今天往前的 n 個月」內（含端點）
-  function isWithinLastNMonths(dateVal, n=6){
-    const t = toDate(dateVal);
-    if (!t) return false;
     const now = new Date();
-    const from = new Date(now.getFullYear(), now.getMonth() - n, now.getDate(), 0,0,0,0).getTime();
-    const ts = t.getTime();
-    return ts >= from && ts <= now.getTime();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth() + 1; // 1-12
+
+    // 1. 找出「當下」應該要對應哪一個檢查月份
+    // 邏輯：在 CONFIG.CHECK_MONTHS 裡面，找出「小於等於目前月份」的最大值
+    // 例如設定 [1, 7]
+    // 若現在是 2月 -> 目標是 1月
+    // 若現在是 8月 -> 目標是 7月
+    // 若現在是 1月 -> 目標是 1月
+    
+    // 先排序確保順序
+    const sortedMonths = CONFIG.CHECK_MONTHS.sort((a,b) => a-b);
+    
+    let targetMonth = null;
+    // 逆向尋找，找到第一個比現在月份小的檢查月
+    for (let i = sortedMonths.length - 1; i >= 0; i--) {
+        if (currentMonth >= sortedMonths[i]) {
+            targetMonth = sortedMonths[i];
+            break;
+        }
+    }
+
+    // 如果現在月份比列表裡最小的還小 (例如設定[4,7], 現在是2月)，那應該要看去年的最後一次嗎？
+    // 依照您的規則：「當年」的檢查。
+    // 如果現在是 2026/02，設定是 [1, 7]，目標就是 2026/01。
+    // 如果現在是 2026/01，目標也是 2026/01。
+    // 如果現在還沒到檢查月（理論上不太可能，除非設定檔只有[12]然後現在是1月），暫設為年初
+    
+    if (targetMonth === null) {
+        // 這種情況很少見，除非設定 [7] 但現在是 2月。
+        // 這種情況代表今年還沒到檢查週期，暫時算 Pass 還是 Fail?
+        // 根據您的規則，應由使用者自行定義，這裡假設若未達第一個檢查月，則不強制檢查(或檢查去年的)。
+        // 但依您的例子 (1月與7月)，目前一定會落入 1 或 7。
+        targetMonth = sortedMonths[0]; 
+    }
+
+    const targetYear = currentYear;
+
+    // 2. 檢查紀錄是否「剛好」落在該年份與月份
+    const rYear = recordDate.getFullYear();
+    const rMonth = recordDate.getMonth() + 1;
+
+    // 判斷：年份必須相同 且 月份必須是目標月
+    // (例如：現在8月，目標7月。若紀錄是6月 -> NG。若紀錄是7月 -> OK)
+    const isMatch = (rYear === targetYear && rMonth === targetMonth);
+
+    return {
+        isOk: isMatch,
+        targetStr: `${targetYear}年${targetMonth}月`,
+        recordStr: `${rYear}年${rMonth}月`
+    };
   }
 
-  // ✅ 載入攝影機清單
+  // ... (以下攝影機與資料載入邏輯與之前類似，但微調顯示) ...
+
   async function initCameraOptions() {
     try {
       const devices = await Html5Qrcode.getCameras();
       const select = document.getElementById("cameraSelect");
       select.innerHTML = "";
-
-      if (devices.length === 0) {
-        alert("找不到攝影機！");
-        return;
-      }
-
-      devices.forEach((device, index) => {
-        const option = document.createElement("option");
-        option.value = device.id;
-        option.text = device.label || `Camera ${index + 1}`;
-        select.appendChild(option);
+      if (devices.length === 0) return alert("找不到攝影機！");
+      devices.forEach((d, i) => {
+        let opt = document.createElement("option");
+        opt.value = d.id; opt.text = d.label || `Camera ${i+1}`;
+        select.appendChild(opt);
       });
-
-      // 若有多顆鏡頭才顯示下拉
       select.style.display = devices.length > 1 ? "block" : "none";
-
       currentCameraId = select.value;
       select.addEventListener("change", async () => {
         currentCameraId = select.value;
         await restartScanner();
       });
-
       await startScanner();
-    } catch (err) {
-      alert("無法存取攝影機：" + err.message);
-    }
+    } catch (e) { alert("攝影機錯誤: " + e.message); }
   }
 
-  // ✅ 啟動掃描器
   async function startScanner() {
     if (!currentCameraId) return;
-
-    await qrScanner.start(
-      currentCameraId,
-      {
-        fps: 5,
-        aspectRatio: 1.777,
-        qrbox: { width: 250, height: 250 },
-        videoConstraints: {
-          width: { ideal: 640 },
-          height: { ideal: 480 },
-          facingMode: "environment"
-        }
+    await qrScanner.start(currentCameraId, { fps: 5, qrbox: 250 }, 
+      (txt) => {
+        scannedCarId = txt.trim();
+        document.getElementById("carIdDisplay").innerText = `🚚 編號：${scannedCarId}`;
+        qrScanner.stop().then(() => displayResultFromCache(scannedCarId));
       },
-      (qrCodeMessage) => {
-        scannedCarId = qrCodeMessage.trim();
-        document.getElementById("carIdDisplay").innerText = `🚚 台車編號：${scannedCarId}`;
-        qrScanner.stop().then(() => {
-          displayResultFromCache(scannedCarId);
-        }).catch(()=>{ /* 安全忽略 */ });
-      },
-      (/* errorMessage */) => { /* 可忽略連續失敗 */ }
+      () => {}
     );
   }
-
   async function restartScanner() {
-    if (qrScanner && qrScanner.isScanning) {
-      await qrScanner.stop();
-    }
+    if (qrScanner.isScanning) await qrScanner.stop();
     await startScanner();
   }
 
-  // ✅ 根據快取資料顯示結果（把「重新掃描」放到日期上方）
   function displayResultFromCache(carId) {
-    const matches = allRecords
-      .filter(r => r.carId === carId)
-      .sort((a, b) => new Date(b.time) - new Date(a.time));
+    const matches = allRecords.filter(r => r.carId === carId).sort((a,b)=>new Date(b.time)-new Date(a.time));
     const result = matches[0];
-    const resultArea = document.getElementById("resultArea");
-    resultArea.innerHTML = "";
+    const area = document.getElementById("resultArea");
+    area.innerHTML = `<div style="text-align:center; margin-bottom:12px;"><button id="rescanBtn">🔄 掃描下一台</button></div>`;
 
-    // 先插入「重新掃描」按鈕（在日期上方）
-    resultArea.innerHTML += `
-      <div style="text-align:center; margin-bottom:12px;">
-        <button id="rescanBtn">🔄 點我掃下一台</button>
-      </div>
-    `;
-
-    // 若無資料，顯示錯誤訊息（按鈕已在上面）
     if (!result) {
-      resultArea.innerHTML += `<p class="error">❌ 查無 ${carId} 過去一年的點檢資料</p>`;
-      // 綁事件
-      document.getElementById("rescanBtn").addEventListener("click", async () => {
-        resultArea.innerHTML = "";
-        document.getElementById("carIdDisplay").innerText = "📷 等待重新掃描 QR Code...";
-        await restartScanner();
-      });
-      return;
-    }
+      area.innerHTML += `<p class="error">❌ 查無 ${carId} 近期資料</p>`;
+    } else {
+      // 使用新的邏輯檢查
+      const status = checkPeriodicStatus(result.time);
+      
+      const badgeHTML = status.isOk
+      ? `<div class="badge-wrap"><div class="badge badge-green"><svg viewBox="0 0 24 24"><path d="M9 16.2l-3.5-3.5a1 1 0 10-1.4 1.4l4.2 4.2a1 1 0 001.4 0l9-9a1 1 0 10-1.4-1.4L9 16.2z"/></svg><span>本期合格 (${status.targetStr})</span></div></div>`
+      : `<div class="badge-wrap"><div class="badge badge-red"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M6 18L18 6" stroke-width="2"/></svg><span>本期未點檢</span></div></div>`;
+      
+      // 顯示詳細原因 (除錯用，讓使用者知道為何 NG)
+      // 若 NG，提示應該要是幾月
+      let detailMsg = `📅 最近點檢：${result.time}`;
+      if (!status.isOk) {
+          detailMsg += `<br><span style="color:#dc2626; font-size:13px;">(需有 ${status.targetStr} 之紀錄，目前為 ${status.recordStr})</span>`;
+      }
 
-    const within6M = isWithinLastNMonths(result.time, 6);
-
-    // 徽章
-    const badgeHTML = within6M
-      ? `
-      <div class="badge-wrap">
-        <div class="badge badge-green" title="已檢驗（半年內）">
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M9 16.2l-3.5-3.5a1 1 0 10-1.4 1.4l4.2 4.2a1 1 0 001.4 0l9-9a1 1 0 10-1.4-1.4L9 16.2z"></path>
-          </svg>
-          <span>已檢驗</span>
-        </div>
-      </div>`
-      : `
-      <div class="badge-wrap">
-        <div class="badge badge-red" title="半年以上未點檢">
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M6 6l12 12M6 18L18 6" stroke-width="2"></path>
-          </svg>
-          <span>半年以上未點檢</span>
-        </div>
-      </div>`;
-
-    // 日期列（按鈕已在上方）
-    resultArea.innerHTML += `
-      <div class="date-row">
-        ${badgeHTML}
-        <div class="info">📅 點檢時間：${result.time}</div>
-      </div>
-    `;
-
-    // 其餘欄位
-    const fields = Object.entries(result).filter(([key]) => !['carId', 'time'].includes(key));
-    for (const [key, val] of fields) {
-      resultArea.innerHTML += `
-        <div class="card">
-          <div class="card-title">${key}</div>
-          <div class="card-content">${val ?? "-"}</div>
+      area.innerHTML += `
+        <div class="date-row">
+          ${badgeHTML}
+          <div class="info">${detailMsg}</div>
         </div>
       `;
-    }
 
-    // 綁定「重新掃描」事件
-    document.getElementById("rescanBtn").addEventListener("click", async () => {
-      resultArea.innerHTML = "";
-      document.getElementById("carIdDisplay").innerText = "📷 等待重新掃描 QR Code...";
-      await restartScanner();
+      const fields = Object.entries(result).filter(([k])=>!['carId','time'].includes(k));
+      for(const [k,v] of fields) {
+        area.innerHTML += `<div class="card"><div class="card-title">${k}</div><div class="card-content">${v||"-"}</div></div>`;
+      }
+    }
+    
+    document.getElementById("rescanBtn").addEventListener("click", async()=>{
+      area.innerHTML=""; document.getElementById("carIdDisplay").innerText="📷 等待掃描..."; await restartScanner();
     });
   }
 
-  // ✅ 預載資料（只抓今天往前一年）
-  async function preloadDataAndInit() {
+  async function preload() {
     const until = todayYMD();
-    const from  = minusOneYearSameDay(until);
-    const overlay = document.getElementById("loadingOverlay");
+    const from = minus18Months(until); // 抓寬鬆一點，確保抓得到資料
+    const ov = document.getElementById("loadingOverlay");
+    
+    // 輔助函式：篩選日期區間
+    const filterRange = (arr) => {
+        const f = new Date(from).getTime();
+        const u = new Date(until).setHours(23,59,59);
+        return (arr||[]).filter(r=>{
+            const t = toDate(r.time);
+            return t && t.getTime() >= f && t.getTime() <= u;
+        });
+    }
+
     try {
-      const res = await fetch(`${GAS_URL}?mode=list&from=${encodeURIComponent(from)}&until=${encodeURIComponent(until)}`, { cache: "no-store" });
-      if (!res.ok) throw new Error("GAS 回傳非 200：" + res.status);
+      const res = await fetch(`${CONFIG.GAS_URL}?mode=list&from=${from}&until=${until}`);
       const data = await res.json();
-
-      const raw = data.records || [];
-      allRecords = filterByRange(raw, from, until);
-
-      overlay.style.display = "none";
+      allRecords = filterRange(data.records);
+      ov.style.display="none";
       await initCameraOptions();
-    } catch (err) {
-      overlay.textContent = "⚠️ 後端區間請求失敗，改用前端篩選…";
+    } catch(e) {
+      ov.textContent = "⚠️ 讀取失敗，嘗試載入全部...";
       try {
-        const res2 = await fetch(`${GAS_URL}?mode=list`, { cache: "no-store" });
-        if (!res2.ok) throw new Error("GAS 回傳非 200：" + res2.status);
-        const data2 = await res2.json();
-        const raw2 = data2.records || [];
-        allRecords = filterByRange(raw2, from, until);
-        overlay.style.display = "none";
-        await initCameraOptions();
-      } catch (err2) {
-        overlay.textContent = "❌ 載入資料失敗：" + err2.message;
-      }
+          const res2 = await fetch(`${CONFIG.GAS_URL}?mode=list`);
+          const data2 = await res2.json();
+          allRecords = filterRange(data2.records);
+          ov.style.display="none";
+          await initCameraOptions();
+      } catch(e2) { ov.textContent="❌ 資料載入失敗"; }
     }
   }
 
-  preloadDataAndInit();
+  preload();
 </script>
 </body>
 </html>
