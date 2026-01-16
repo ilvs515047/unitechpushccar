@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>📋 燿華台車點檢紀錄總覽</title>
+  <style>
+    :root { color-scheme: light; }
+    body { font-family:"Segoe UI","Microsoft JhengHei",sans-serif; margin:0; padding:20px; background:#f5faff; }
+    h2 { text-align:center; margin-bottom:12px; color:#333; }
+    #search { width:100%; max-width:300px; margin:0 auto 16px; display:block;
+      padding:8px 12px; font-size:16px; border-radius:8px; border:1px solid #ccc; }
+    table { width:100%; border-collapse:collapse; margin-top:10px; font-size:14px; }
+    th,td { border:1px solid #ddd; padding:8px; text-align:center; }
+    th { background:#ffdd99; } tr:nth-child(even){ background:#fdf6ea; }
+    .container { overflow-x:auto; }
+
+    /* ===== 備註欄位樣式 ===== */
+    input.note-input { width: 70%; padding: 6px 10px; border: 1px solid #ccc; border-radius: 8px; outline: none; transition: 0.2s; box-shadow: inset 0 1px 3px rgba(0,0,0,0.1); }
+    input.note-input:focus { border-color: #66afe9; box-shadow: 0 0 5px rgba(102,175,233,0.6); }
+    input.note-input.pending { border-color:#ff9800; background:#fff8e1; }
+    button.note-save { margin-left: 6px; padding: 6px 12px; background-color: #ffc107; color: #333; font-weight: bold; border: none; border-radius: 8px; cursor: pointer; transition: 0.2s; }
+    button.note-save:hover { background-color: #ff9800; }
+    .save-status { display: inline-block; margin-left: 8px; font-size: 13px; color: #28a745; font-weight: bold; transition: opacity 0.3s; }
+
+    /* ===== 上方工具列（日期選擇器） ===== */
+    .topbar-wrap { position: sticky; top: 0; z-index: 5; background: #f5faff; padding-bottom: 8px; }
+    .topbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: -8px 0 8px; padding: 8px 0; }
+    .logout-btn { padding: 6px 10px; border-radius: 10px; border: 1px solid #ddd; background: #fff; cursor: pointer; }
+
+    .date-picker{
+      display:flex; align-items:center; gap:8px;
+      background:#fff; border:1px solid #ddd; padding:6px 10px; border-radius:10px;
+      box-shadow: 0 3px 10px rgba(0,0,0,.06);
+    }
+    .date-picker label{ font-size:14px; color:#333; white-space:nowrap; }
+    .date-input{
+      padding:6px 10px; border:1px solid #ccc; border-radius:8px; font-size:14px; background:#fff;
+    }
+
+    /* ===== 左側直排容器 ===== */
+    .topbar-left{
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+    }
+    /* 連結按鈕樣式 */
+    #linkBtn{
+      background:#2563eb;
+      color:#fff;
+      border:1px solid #1e40af;
+    }
+    #linkBtn:hover{ filter:brightness(1.05); }
+
+    /* 下載按鈕樣式 (新增) */
+    #downloadBtn {
+      background: #198754; /* Excel 綠色 */
+      color: #fff;
+      border: 1px solid #157347;
+    }
+    #downloadBtn:hover { filter:brightness(1.05); }
+
+    /* ===== 密碼登入門 ===== */
+    #authOverlay{ position:fixed; inset:0; z-index:10000;
+      background:linear-gradient(160deg,#1f2937,#111827);
+      display:flex; align-items:center; justify-content:center; color:#e5e7eb; }
+    .auth-card{ width:min(92vw,420px); background:#111827; border:1px solid #374151;
+      border-radius:16px; padding:22px; box-shadow: 0 10px 30px rgba(0,0,0,.35); }
+    .auth-title{ font-size:18px; margin:0 0 12px; }
+    .auth-hint { opacity:.85; font-size: 14px; margin-bottom: 12px; }
+    .auth-row{ display:flex; gap:8px; }
+    .auth-input{ flex:1; padding:10px 12px; border-radius:10px; background:#0b1220; color:#e5e7eb; border:1px solid #334155; outline:none; font-size:16px; }
+    .auth-input:focus { border-color: #60a5fa; box-shadow: 0 0 0 3px rgba(59,130,246,.25); }
+    .auth-btn{ padding:10px 14px; border-radius:10px; border:none; background:#60a5fa; cursor:pointer; font-weight:700; color:#0b1220; }
+    .auth-btn:hover { filter:brightness(1.05); }
+    #authErr{ color:#fca5a5; font-size:13px; margin-top:8px; min-height:18px; }
+
+    /* ===== 閃電進度條（載入動畫） ===== */
+    #pageLoader{ position:fixed; inset:0; background:#0f172a;
+      display:none; flex-direction:column; justify-content:center; align-items:center;
+      z-index:20000; transition:opacity 1s ease; }
+    #pageLoader.fade-out{ opacity:0; pointer-events:none; }
+    .progress{ position:relative; width:260px; height:14px; border-radius:999px; overflow:hidden; background:rgba(255,255,255,.1);}
+    .progress .layer{ position:absolute; inset:-50% -30%; mix-blend-mode:screen; }
+    .progress .l1{ background:repeating-linear-gradient(-45deg,transparent 0 18px,rgba(255,235,59,.95)18px 22px,transparent 22px 40px);
+      animation:sweepR 1.05s linear infinite; filter:drop-shadow(0 0 6px rgba(255,255,120,.8)); }
+    .progress .l2{ background:repeating-linear-gradient(45deg,transparent 0 18px,rgba(120,200,255,.9)18px 22px,transparent 22px 40px);
+      animation:sweepL 1.25s linear infinite; filter:drop-shadow(0 0 6px rgba(120,200,255,.8)); }
+    .progress .glow{ position:absolute; inset:0; background:radial-gradient(circle,rgba(255,255,255,.25),透明 70%);}
+    @keyframes sweepR{from{transform:translateX(-20%);}to{transform:translateX(30%);} }
+    @keyframes sweepL{from{transform:translateX(20%);}to{transform:translateX(-30%);} }
+    #pageLoader p{ color:#e5e7eb; margin-top:18px; font-size:15px; font-weight:bold; }
+
+    /* 主系統預設隱藏（避免白屏時閃爍） */
+    #app{ display:none; }
+
+    /* ===== 懸浮「批次更新備註」按鈕 ===== */
+    .fab-wrap{
+      position:fixed; right:18px; bottom:20px; z-index:15000;
+      display:flex; flex-direction:column; gap:10px; align-items:flex-end;
+    }
+    .fab{
+      display:flex; align-items:center; gap:8px;
+      padding:10px 14px; border:none; border-radius:999px;
+      box-shadow:0 6px 18px rgba(0,0,0,.15);
+      cursor:pointer; background:#2563eb; color:#fff; font-weight:700;
+    }
+    .fab[disabled]{ opacity:.5; cursor:not-allowed; }
+    .fab .count{
+      min-width:20px; height:20px; border-radius:999px; padding:0 6px;
+      background:#f59e0b; color:#111; display:inline-flex; align-items:center; justify-content:center; font-size:12px; font-weight:800;
+    }
+    .fab-hint{ font-size:12px; color:#333; background:#fff; border:1px solid #eee; border-radius:8px; padding:6px 8px; }
+  </style>
+</head>
+<body>
+
+<div id="pageLoader">
+  <div class="progress">
+    <span class="layer l1"></span>
+    <span class="layer l2"></span>
+    <span class="glow"></span>
+  </div>
+  <p id="loaderMsg">⚡ 連接資料庫中，請稍候，正載入中…</p>
+</div>
+
+<div id="authOverlay" aria-modal="true" role="dialog">
+  <div class="auth-card">
+    <h3 class="auth-title">🔐 需要密碼</h3>
+    <p class="auth-hint">請輸入密碼後進入系統（本頁僅前端保護，適合內網）。</p>
+    <div class="auth-row">
+      <input id="authInput" class="auth-input" type="password" placeholder="輸入密碼" autocomplete="current-password"/>
+      <button id="authBtn" class="auth-btn">登入</button>
+    </div>
+    <div id="authErr"></div>
+  </div>
+</div>
+
+<div id="app">
+  <div class="topbar-wrap">
+    <div class="topbar">
+      <div class="topbar-left">
+        <div class="date-picker">
+          <label for="datePicker">📆 截止日期（往前 1 年）</label>
+          <input id="datePicker" class="date-input" type="date" />
+          <button id="dateLoadBtn" class="logout-btn" style="border-color:#ccc">載入</button>
+        </div>
+        <div style="display:flex; gap:8px;">
+           <button id="linkBtn" class="logout-btn">🔗 檢視全部點檢資料</button>
+           <button id="downloadBtn" class="logout-btn">📥 下載 Excel</button>
+        </div>
+      </div>
+
+      <button id="logoutBtn" class="logout-btn">🚪 登出</button>
+    </div>
+  </div>
+
+  <h2>📋 燿華電子台車點檢紀錄總覽</h2>
+  <input type="text" id="search" placeholder="🔍 搜尋台車編號、工號、內容…">
+  <div class="container">
+    <table id="recordTable">
+      <thead><tr id="tableHead"></tr></thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<div class="fab-wrap" id="fabWrap" style="display:none;">
+  <div class="fab-hint">編輯多筆備註後，一鍵送出</div>
+  <button class="fab" id="batchBtn" disabled>
+    📤 批次更新備註
+    <span class="count" id="batchCount">0</span>
+  </button>
+</div>
+
+<script>
+// ========================
+// 0) 基本密碼設定（改用 Hash 保護）
+// ========================
+const HASHED_PASSWORD = "156b98ec045ecf7123f24d487fb88411bd2e2499cb8d574ef67aaef5cf6ef988";
+
+const REMEMBER_HOURS = 8;               // 8 小時免登
+const AUTH_KEY = "ut_cart_admin_authed";
+
+function setAuthed(hours){ localStorage.setItem(AUTH_KEY, String(Date.now()+hours*3600*1000)); }
+function isAuthed(){ return Number(localStorage.getItem(AUTH_KEY)||0) > Date.now(); }
+function logout(){
+  localStorage.removeItem(AUTH_KEY);
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('fabWrap').style.display = 'none';
+  document.getElementById('authOverlay').style.display = 'flex';
+  document.getElementById('authInput').value = '';
+  document.getElementById('authInput').focus();
+}
+
+// 雜湊計算工具函式 (使用瀏覽器內建 Crypto API)
+async function sha256(message) {
+  const msgBuffer = new TextEncoder().encode(message);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+// 元素
+const $overlay=document.getElementById('authOverlay');
+const $app=document.getElementById('app');
+const $input=document.getElementById('authInput');
+const $btn=document.getElementById('authBtn');
+const $err=document.getElementById('authErr');
+const $logout=document.getElementById('logoutBtn');
+const loader=document.getElementById("pageLoader");
+const loaderMsg=document.getElementById("loaderMsg");
+const $fabWrap=document.getElementById("fabWrap");
+const $batchBtn=document.getElementById("batchBtn");
+const $batchCount=document.getElementById("batchCount");
+const $datePicker=document.getElementById("datePicker");
+const $dateLoadBtn=document.getElementById("dateLoadBtn");
+const $linkBtn=document.getElementById("linkBtn");
+const $downloadBtn=document.getElementById("downloadBtn"); // 新增
+
+// ====== 你要前往的網址（View All 連結） ======
+const LINK_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTboNzz0ge1oYtK0586Eg1ODFx2ddxJE7cjNp-nDrsQE_srR7LgXhc427z3ObfB0DGqQjIM00eb6JPX/pubhtml";
+
+// ====== [重要] 請在此填入您的 Google Sheet ID 以供下載使用 ======
+// 範例：https://docs.google.com/spreadsheets/d/1aBcD...123/edit
+// 變數內容請填寫 d/ 後面那串
+const SHEET_ID_FOR_DOWNLOAD = "2PACX-1vTboNzz0ge1oYtK0586Eg1ODFx2ddxJE7cjNp-nDrsQE_srR7LgXhc427z3ObfB0DGqQjIM00eb6JPX";
+
+// ====== GAS URL ======
+const GAS_URL="https://script.google.com/macros/s/AKfycbxBYOrRPbzVUeiZmJHvL17tPHt_lcyvr3R84Op-fY00Owq1ysr1sl-LFBvT-BfL_biTsQ/exec?mode=list";
+const GAS_URL_SAVE="https://script.google.com/macros/s/AKfycbxBYOrRPbzVUeiZmJHvL17tPHt_lcyvr3R84Op-fY00Owq1ysr1sl-LFBvT-BfL_biTsQ/exec";
+
+// 欄位隱藏：第 3 與第 4 欄（0 起算）
+const hiddenColumnIndexes = [2, 3];
+
+// ====== Loader 控制 ======
+function showLoader(msg){
+  if(msg) loaderMsg.textContent = msg;
+  loader.classList.remove("fade-out");
+  loader.style.display="flex";
+}
+function hideLoader(){
+  loader.classList.add("fade-out");
+  setTimeout(()=>{ loader.style.display="none"; }, 800);
+}
+
+// ========================
+// A) 批次待送清單（前端側）
+// ========================
+const pendingMap = new Map();
+function makeKey(timestamp, carId){ return `${timestamp}__${carId}`; }
+function updateFab(){ const n = pendingMap.size; $batchCount.textContent = n; $batchBtn.disabled = n === 0; }
+function markPending(inputEl){
+  const ts = inputEl.dataset.timestamp;
+  const car = inputEl.dataset.carid;
+  const note = inputEl.value.trim();
+  const key = makeKey(ts, car);
+  if(!note){ pendingMap.delete(key); inputEl.classList.remove('pending'); }
+  else { pendingMap.set(key, { timestamp: ts, carId: car, note, inputEl }); inputEl.classList.add('pending'); }
+  updateFab();
+}
+function clearPendingFor(inputEl){
+  const key = makeKey(inputEl.dataset.timestamp, inputEl.dataset.carid);
+  pendingMap.delete(key); inputEl.classList.remove('pending'); updateFab();
+}
+async function batchUpdateNotes(){
+  if(pendingMap.size===0) return;
+  const items = Array.from(pendingMap.values());
+  showLoader(`💾 批次儲存中 0/${items.length}…`);
+  let ok=0, fail=0, idx=0;
+  for(const it of items){
+    idx++; loaderMsg.textContent = `💾 批次儲存中 ${idx}/${items.length}…`;
+    try{
+      const res = await fetch(GAS_URL_SAVE, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: `mode=note&carId=${encodeURIComponent(it.carId)}&timestamp=${encodeURIComponent(it.timestamp)}&note=${encodeURIComponent(it.note)}`
+      });
+      await res.text();
+      writeNoteBackToRow(it.inputEl, it.note);
+      it.inputEl.value = ""; it.inputEl.classList.remove('pending'); ok++;
+    }catch(e){
+      fail++; it.inputEl.style.boxShadow = "0 0 0 3px rgba(220,53,69,.35)";
+      setTimeout(()=> it.inputEl.style.boxShadow="", 1200);
+    }
+    pendingMap.delete(makeKey(it.timestamp, it.carId)); updateFab();
+  }
+  hideLoader(); alert(`批次完成：成功 ${ok} 筆，失敗 ${fail} 筆`);
+}
+function writeNoteBackToRow(inputEl, noteText){
+  const tr = inputEl.closest("tr"); if(!tr) return;
+  const allTds = tr.querySelectorAll("td");
+  if (allTds.length >= 2){
+    const noteCell = allTds[allTds.length - 2];
+    const tdNote = allTds[allTds.length - 1];
+    if (noteCell && noteCell !== tdNote){ noteCell.textContent = noteText; }
+  }
+  const status = tr.querySelector(".save-status");
+  if(status){ status.textContent = "✅ 已批次儲存！"; status.style.color = "#28a745"; setTimeout(()=> status.textContent="", 2500); }
+}
+$batchBtn.addEventListener('click', batchUpdateNotes);
+
+// ====== 日期選擇器：初始化與事件 ======
+function todayISO(){ const d=new Date(); const m=String(d.getMonth()+1).padStart(2,'0'); const day=String(d.getDate()).padStart(2,'0'); return `${d.getFullYear()}-${m}-${day}`; }
+function initDatePicker(){ $datePicker.value = todayISO(); }
+const $datePickerEl = $datePicker;
+
+$dateLoadBtn?.addEventListener('click', ()=>{
+  if(!$datePicker.value){ alert('請選擇日期'); return; }
+  const d = $datePicker.value;
+  showLoader(`⚡ 正載入 ${d} 往前 1 年的資料…`);
+  initAppAfterAuth();
+});
+$datePicker?.addEventListener('keydown',(e)=>{ if(e.key==='Enter') $dateLoadBtn.click(); });
+
+// ====== 連結按鈕事件 ======
+$linkBtn?.addEventListener('click', ()=>{
+  if(!LINK_URL){
+    alert('尚未設定連結網址，請在程式碼中的 LINK_URL 填入你的網址。');
+    return;
+  }
+  const until = ($datePicker && $datePicker.value) ? $datePicker.value : todayISO();
+  const from  = minusOneYearSameDay(until);
+  const url   = `${LINK_URL}?from=${encodeURIComponent(from)}&until=${encodeURIComponent(until)}`;
+  window.open(url, '_blank', 'noopener');
+});
+
+// ====== 下載按鈕事件 (新增) ======
+$downloadBtn?.addEventListener('click', ()=>{
+    if(!SHEET_ID_FOR_DOWNLOAD || SHEET_ID_FOR_DOWNLOAD.includes("在此填入")){
+        alert("請先在程式碼中的 SHEET_ID_FOR_DOWNLOAD 變數填入您的 Google Sheet ID！");
+        return;
+    }
+    // 建立下載專用的連結
+    // 格式: https://docs.google.com/spreadsheets/d/[ID]/export?format=xlsx
+    const downloadUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID_FOR_DOWNLOAD}/export?format=xlsx`;
+    
+    // 開啟新視窗下載
+    window.open(downloadUrl, '_blank');
+});
+
+// ====== 授權流程（核心修改處） ======
+async function unlockIfAuthed(){
+  if(isAuthed()){
+    $overlay.style.display="none";
+    initDatePicker();
+    showLoader(`⚡ 正載入 ${$datePicker.value} 往前 1 年的資料…`);
+    initAppAfterAuth();
+  }
+}
+
+// 登入邏輯：計算輸入的 hash 並比對
+async function tryLogin(){
+  const pw = ($input.value||"").trim();
+  if(!pw){ $err.textContent="請先輸入密碼"; return; }
+   
+  // 顯示一點載入感（雖然 hash 很快）
+  // 計算 hash
+  try {
+    const userHash = await sha256(pw);
+    if(userHash === HASHED_PASSWORD){
+      setAuthed(REMEMBER_HOURS);
+      $overlay.style.display="none";
+      initDatePicker();
+      showLoader(`⚡ 正載入 ${$datePicker.value} 往前 1 年的資料…`);
+      initAppAfterAuth();
+      $err.textContent="";
+    }else{
+      $err.textContent="密碼錯誤";
+    }
+  } catch (e) {
+    console.error(e);
+    $err.textContent = "驗證過程發生錯誤 (瀏覽器環境不支援)";
+  }
+}
+
+$btn.addEventListener('click', tryLogin);
+$input.addEventListener('keydown', e=>{ if(e.key==="Enter") tryLogin(); });
+$logout.addEventListener('click', logout);
+
+// 初次啟動
+unlockIfAuthed();
+if ($overlay.style.display !== 'none') $input.focus();
+
+// ========================
+// 1) 初始化資料（登入後執行）
+// ========================
+async function initAppAfterAuth(){
+  const untilYMD = ($datePicker && $datePicker.value) ? $datePicker.value : todayISO();
+  const fromYMD  = minusOneYearSameDay(untilYMD);
+  try{
+    const tryUrl = `${GAS_URL}&from=${encodeURIComponent(fromYMD)}&until=${encodeURIComponent(untilYMD)}`;
+    const res=await fetch(tryUrl);
+    if(!res.ok) throw new Error("GAS 回傳非 200：" + res.status);
+    const raw=await res.json();
+    const data = filterByRange(raw, fromYMD, untilYMD);
+
+    buildTable(data);
+    bindSearch();
+
+    setTimeout(()=>{
+      hideLoader();
+      $app.style.display="block";
+      $fabWrap.style.display="flex";
+    }, 300);
+  }catch(err){
+    console.error("載入失敗:", err);
+    loaderMsg.textContent = "❌ 載入失敗：" + err.message;
+    setTimeout(()=>{
+      hideLoader();
+      $app.style.display="block";
+      $fabWrap.style.display="flex";
+    }, 800);
+  }
+}
+
+// ====== 區間計算＆時間解析 ======
+function minusOneYearSameDay(ymd){
+  const [y,m,d] = ymd.split('-').map(n=>parseInt(n,10));
+  const dt = new Date(y, (m-1), d);
+  dt.setFullYear(dt.getFullYear()-1);
+  const yy = dt.getFullYear();
+  const mm = String(dt.getMonth()+1).padStart(2,'0');
+  const dd = String(dt.getDate()).padStart(2,'0');
+  return `${yy}-${mm}-${dd}`;
+}
+function startOfDay(ymd){
+  const [y,m,d] = ymd.split('-').map(n=>parseInt(n,10));
+  return new Date(y, m-1, d, 0,0,0,0);
+}
+function endOfDay(ymd){
+  const [y,m,d] = ymd.split('-').map(n=>parseInt(n,10));
+  return new Date(y, m-1, d, 23,59,59,999);
+}
+function toDate(val){
+  if (val == null) return null;
+  if (Object.prototype.toString.call(val) === '[object Date]' && !isNaN(val)) return val;
+  const s = String(val).trim();
+  const s19 = s.slice(0,19);
+  const norm = s19.replace(/\//g,'-').replace(' ', 'T');
+  const d = new Date(norm);
+  if (!isNaN(d)) return d;
+  const d2 = new Date(s);
+  return isNaN(d2) ? null : d2;
+}
+function filterByRange(apiData, fromYMD, untilYMD){
+  if (!apiData || !apiData.headers || !apiData.records) {
+    throw new Error("GAS 回傳格式不正確！");
+  }
+  const headers = apiData.headers;
+  let tsIdx = headers.indexOf('時間');
+  if (tsIdx < 0) tsIdx = 0;
+
+  const from = startOfDay(fromYMD);
+  const until = endOfDay(untilYMD);
+
+  const records = apiData.records.filter(row=>{
+    const dt = toDate(row[tsIdx]);
+    if (!dt) return false;
+    const t = dt.getTime();
+    return t >= from.getTime() && t <= until.getTime();
+  });
+
+  return { headers: apiData.headers, records };
+}
+
+// ========================
+// 2) 產生表頭與內容列
+// ========================
+function buildTable(data){
+  const head=document.getElementById("tableHead");
+  const body=document.getElementById("tableBody");
+  head.innerHTML=""; body.innerHTML="";
+
+  if (!data || !data.headers || !data.records) {
+    throw new Error("GAS 回傳格式不正確！");
+  }
+
+  data.headers.forEach((h,i)=>{
+    if (hiddenColumnIndexes.includes(i)) return;
+    const th=document.createElement("th");
+    th.textContent=h;
+    head.appendChild(th);
+  });
+  const thNote=document.createElement("th");
+  thNote.textContent="新增備註";
+  head.appendChild(thNote);
+
+  data.records.forEach(row=>{
+    const tr=document.createElement("tr");
+
+    row.forEach((cell,i)=>{
+      if (hiddenColumnIndexes.includes(i)) return;
+      const td=document.createElement("td");
+      td.textContent = cell ?? "-";
+      tr.appendChild(td);
+    });
+
+    const tdNote=document.createElement("td");
+    const input=document.createElement("input");
+    input.type="text";
+    input.className="note-input";
+    input.placeholder="輸入備註";
+    const timestamp = row[0];
+    const carId       = row[1];
+    input.dataset.timestamp = timestamp;
+    input.dataset.carid = carId;
+
+    input.addEventListener('input', ()=> markPending(input));
+
+    const btn=document.createElement("button");
+    btn.textContent="儲存";
+    btn.className="note-save";
+
+    const status=document.createElement("span");
+    status.className="save-status";
+    status.textContent="";
+
+    btn.onclick = async () => {
+      const note = input.value;
+      if (!note.trim()){
+        status.textContent = "請輸入備註";
+        status.style.color = "#dc3545";
+        return;
+      }
+      showLoader("💾 備註儲存中，請稍候…");
+      try{
+        const res = await fetch(GAS_URL_SAVE, {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: `mode=note&carId=${encodeURIComponent(carId)}&timestamp=${encodeURIComponent(timestamp)}&note=${encodeURIComponent(note)}`
+        });
+        await res.text();
+        hideLoader();
+        status.textContent = "✅ 已儲存！";
+        status.style.color = "#28a745";
+        writeNoteBackToRow(input, note);
+        clearPendingFor(input);
+        input.value = "";
+        setTimeout(()=> status.textContent = "", 3000);
+      }catch(err){
+        hideLoader();
+        status.textContent = "❌ 儲存失敗";
+        status.style.color = "#dc3545";
+      }
+    };
+
+    tdNote.appendChild(input);
+    tdNote.appendChild(btn);
+    tdNote.appendChild(status);
+    tr.appendChild(tdNote);
+    body.appendChild(tr);
+  });
+  pendingMap.clear();
+  updateFab();
+}
+
+// ========================
+// 3) 搜尋
+// ========================
+function bindSearch(){
+  document.getElementById("search").addEventListener("input", e=>{
+    const keyword = e.target.value.trim().toLowerCase();
+    Array.from(document.getElementById("tableBody").rows).forEach(row=>{
+      const match = Array.from(row.cells).some(cell =>
+        cell.textContent.toLowerCase().includes(keyword)
+      );
+      row.style.display = match ? "" : "none";
+    });
+  });
+}
+</script>
+
+</body>
+</html>
