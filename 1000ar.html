@@ -2,138 +2,344 @@
 <html lang="zh-TW">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
-  <title>UT台車 AR 點檢系統 v2</title>
-  <script src="https://unpkg.com/html5-qrcode"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"/>
+  <title>UT台車 AR 點檢系統</title>
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
   <style>
-    body { margin: 0; overflow: hidden; font-family: sans-serif; background: #000; position: relative; width: 100vw; height: 100vh; }
-    #reader { width: 100%; height: 100%; }
-    /* 讓影片填滿全螢幕 */
-    #reader video { object-fit: cover !important; width: 100% !important; height: 100% !important; }
-
-    /* AR 資訊卡 */
-    .ar-card {
-      position: absolute;
-      background: rgba(255, 255, 255, 0.92);
-      border-left: 5px solid #007bff;
-      padding: 10px;
-      border-radius: 8px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
-      width: 180px;
-      z-index: 9999;
-      pointer-events: none; /* 避免擋住觸控 */
-      display: none; 
-      transition: transform 0.1s linear; /* 平滑跟隨 */
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: "Segoe UI", "Microsoft JhengHei", sans-serif;
+      background-color: #000;
+      overflow: hidden; /* 防止滾動，全螢幕體驗 */
     }
 
-    .status-ok { color: #16a34a; font-weight: bold; }
-    .status-ng { color: #dc2626; font-weight: bold; }
-    .ar-info { font-size: 11px; color: #555; margin-top: 4px; }
+    /* 隱藏的原生 Video，用於擷取影像串流 */
+    #videoElement {
+      display: none; 
+    }
 
-    #loadingOverlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); color: white; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 10000; }
+    /* 主畫布：顯示攝影機畫面 + AR 疊加層 */
+    #arCanvas {
+      width: 100vw;
+      height: 100vh;
+      object-fit: cover;
+      display: block;
+    }
+
+    /* 讀取中的遮罩 */
+    #loadingOverlay {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0, 0, 0, 0.85); color: white;
+      display: flex; flex-direction: column;
+      justify-content: center; align-items: center;
+      z-index: 999; text-align: center;
+    }
+    .loading-spinner {
+      border: 4px solid #f3f3f3; border-top: 4px solid #3498db;
+      border-radius: 50%; width: 40px; height: 40px;
+      animation: spin 1s linear infinite; margin-bottom: 15px;
+    }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+    /* 底部資訊列 (HUD) */
+    #hud {
+      position: fixed; bottom: 20px; left: 50%;
+      transform: translateX(-50%);
+      background: rgba(255, 255, 255, 0.9);
+      padding: 10px 20px; border-radius: 30px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+      font-weight: bold; color: #333;
+      white-space: nowrap;
+      z-index: 100;
+      pointer-events: none; /* 讓點擊穿透 */
+    }
+    .hud-icon { margin-right: 5px; }
+
   </style>
 </head>
 <body>
 
-<div id="loadingOverlay">
-  <div>📡 資料庫同步中...</div>
-</div>
+  <div id="loadingOverlay">
+    <div class="loading-spinner"></div>
+    <div id="loadingText">正在下載台車資料庫...</div>
+  </div>
 
-<div id="reader"></div>
+  <video id="videoElement" playsinline muted></video>
+  <canvas id="arCanvas"></canvas>
 
-<div id="infoCard" class="ar-card">
-    <div id="ar-carId" style="font-size: 12px; color: #666;"></div>
-    <div id="ar-status"></div>
-    <div id="ar-date" class="ar-info"></div>
-</div>
+  <div id="hud">📷 請將鏡頭對準台車 QR Code</div>
 
 <script>
+  // ==========================================
+  // ⚙️ 設定檔
+  // ==========================================
   const CONFIG = {
-    CHECK_MONTHS: [1, 7],
+    CHECK_MONTHS: [1, 7], 
     GAS_URL: "https://script.google.com/macros/s/AKfycbyqPEMYcuv3idN9icLCSgIrz7OiPbhVFDQwXcyW8j_Y1iK0FENbjEv-74CHsycONrznqA/exec"
   };
 
   let allRecords = [];
-  const infoCard = document.getElementById('infoCard');
-  const html5QrCode = new Html5Qrcode("reader");
+  const video = document.getElementById("videoElement");
+  const canvas = document.getElementById("arCanvas");
+  const ctx = canvas.getContext("2d");
+  const hud = document.getElementById("hud");
+  const loadingText = document.getElementById("loadingText");
+  const overlay = document.getElementById("loadingOverlay");
 
-  // 狀態判斷邏輯
-  function getCarStatus(carId) {
-    const matches = allRecords.filter(r => r.carId === carId).sort((a,b)=>new Date(b.time)-new Date(a.time));
-    if (matches.length === 0) return { isOk: false, date: "無資料", msg: "❌ 尚未點檢" };
-
-    const lastDate = new Date(matches[0].time);
+  // ==========================================
+  // 📅 日期與邏輯處理 (沿用您的核心邏輯)
+  // ==========================================
+  function todayYMD(){
     const now = new Date();
-    const curMonth = now.getMonth() + 1;
-    
+    const y = now.getFullYear();
+    const m = String(now.getMonth()+1).padStart(2,'0');
+    const d = String(now.getDate()).padStart(2,'0');
+    return `${y}-${m}-${d}`;
+  }
+  
+  function minus18Months(ymd){
+    const [y,m,d] = ymd.split('-').map(n=>parseInt(n,10));
+    const dt = new Date(y, m-1, d);
+    dt.setMonth(dt.getMonth() - 18);
+    const yy = dt.getFullYear();
+    const mm = String(dt.getMonth()+1).padStart(2,'0');
+    const dd = String(dt.getDate()).padStart(2,'0');
+    return `${yy}-${mm}-${dd}`;
+  }
+
+  function toDate(val){
+    if (!val) return null;
+    if (Object.prototype.toString.call(val) === '[object Date]' && !isNaN(val)) return val;
+    const s = String(val).trim().slice(0,19).replace(/\//g,'-').replace(' ', 'T');
+    const d = new Date(s);
+    return isNaN(d) ? null : d;
+  }
+
+  function checkPeriodicStatus(recordDateVal) {
+    const recordDate = toDate(recordDateVal);
+    if (!recordDate) return { isOk: false, msg: "無數據", color: "#999" };
+
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth() + 1;
+
     const sortedMonths = CONFIG.CHECK_MONTHS.sort((a,b) => a-b);
-    let targetMonth = sortedMonths[0];
+    let targetMonth = null;
     for (let i = sortedMonths.length - 1; i >= 0; i--) {
-        if (curMonth >= sortedMonths[i]) { targetMonth = sortedMonths[i]; break; }
+        if (currentMonth >= sortedMonths[i]) {
+            targetMonth = sortedMonths[i];
+            break;
+        }
     }
+    if (targetMonth === null) targetMonth = sortedMonths[0]; 
 
-    const isOk = (lastDate.getFullYear() === now.getFullYear() && (lastDate.getMonth() + 1) === targetMonth);
-    return { isOk, date: matches[0].time, msg: isOk ? "✅ 本期合格" : "⚠️ 非本期紀錄" };
+    const targetYear = currentYear;
+    const rYear = recordDate.getFullYear();
+    const rMonth = recordDate.getMonth() + 1;
+    const isMatch = (rYear === targetYear && rMonth === targetMonth);
+
+    return {
+        isOk: isMatch,
+        targetStr: `${targetMonth}月`,
+        recordStr: `${rMonth}月`,
+        lastDate: `${rYear}/${rMonth}/${recordDate.getDate()}`
+    };
   }
 
-  const onScanSuccess = (decodedText, decodedResult) => {
-    // 關鍵修正：從 decodedResult.region 獲取 QR Code 的座標範圍
-    const region = decodedResult.region;
-    if (region && region.bbox) {
-        const { x, y, width, height } = region.bbox;
+  // 從資料庫找車
+  function getCarData(carId) {
+    // 找出所有符合 carId 的紀錄，取最新的一筆
+    const matches = allRecords.filter(r => r.carId === carId).sort((a,b)=>new Date(b.time)-new Date(a.time));
+    if (matches.length === 0) return null;
+    return matches[0];
+  }
+
+  // ==========================================
+  // 🎥 攝影機與 AR 繪圖核心
+  // ==========================================
+  
+  function startCamera() {
+    // 使用 facingMode: "environment" 強制後鏡頭
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+      .then(function(stream) {
+        video.srcObject = stream;
+        video.setAttribute("playsinline", true); // iOS 必須
+        video.play();
+        requestAnimationFrame(tick);
+      })
+      .catch(err => {
+        alert("無法開啟攝影機：" + err.message);
+      });
+  }
+
+  function drawLine(begin, end, color) {
+    ctx.beginPath();
+    ctx.moveTo(begin.x, begin.y);
+    ctx.lineTo(end.x, end.y);
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = color;
+    ctx.stroke();
+  }
+
+  function drawRoundedRect(x, y, width, height, radius, color) {
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(x + radius, y);
+    ctx.lineTo(x + width - radius, y);
+    ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+    ctx.lineTo(x + width, y + height - radius);
+    ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+    ctx.lineTo(x + radius, y + height);
+    ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+    ctx.lineTo(x, y + radius);
+    ctx.quadraticCurveTo(x, y, x + radius, y);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  function tick() {
+    if (video.readyState === video.HAVE_ENOUGH_DATA) {
+      // 1. 設定 Canvas 大小與影片一致
+      canvas.height = video.videoHeight;
+      canvas.width = video.videoWidth;
+      
+      // 2. 繪製當前攝影機畫面到 Canvas (這就是背景)
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      // 3. 使用 jsQR 分析畫面中的像素
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const code = jsQR(imageData.data, imageData.width, imageData.height, {
+        inversionAttempts: "dontInvert",
+      });
+
+      // 4. 如果發現 QR Code
+      if (code && code.data) {
+        const carId = code.data.trim();
+        const record = getCarData(carId);
+
+        let color = "#FF3B30"; // 預設紅色 (Fail/未知)
+        let titleText = "未知台車";
+        let subText = "查無此編號資料";
+        let statusIcon = "❌";
+
+        if (record) {
+            const status = checkPeriodicStatus(record.time);
+            if (status.isOk) {
+                color = "#34C759"; // 綠色 (Pass)
+                titleText = `${carId} (合格)`;
+                subText = `已檢: ${status.lastDate}`;
+                statusIcon = "✅";
+            } else {
+                color = "#FF3B30"; // 紅色 (Fail)
+                titleText = `${carId} (未檢)`;
+                subText = `需檢: ${status.targetStr} (目前:${status.recordStr})`;
+                statusIcon = "⚠️";
+            }
+        } else {
+            // 資料庫沒這台車
+            titleText = `${carId}`;
+        }
+
+        // --- AR 繪圖區 ---
+
+        // A. 畫出 QR Code 的邊框
+        drawLine(code.location.topLeftCorner, code.location.topRightCorner, color);
+        drawLine(code.location.topRightCorner, code.location.bottomRightCorner, color);
+        drawLine(code.location.bottomRightCorner, code.location.bottomLeftCorner, color);
+        drawLine(code.location.bottomLeftCorner, code.location.topLeftCorner, color);
+
+        // B. 計算標籤顯示位置 (在 QR Code 上方)
+        // 取 top-left 和 top-right 的中間點
+        const centerX = (code.location.topLeftCorner.x + code.location.topRightCorner.x) / 2;
+        const topY = Math.min(code.location.topLeftCorner.y, code.location.topRightCorner.y);
         
-        // 更新內容
-        const status = getCarStatus(decodedText);
-        document.getElementById('ar-carId').innerText = "編號: " + decodedText;
-        document.getElementById('ar-status').innerText = status.msg;
-        document.getElementById('ar-status').className = status.isOk ? 'status-ok' : 'status-ng';
-        document.getElementById('ar-date').innerText = "日期: " + status.date;
+        // C. 繪製浮動資訊卡 (HUD Tag)
+        const boxWidth = 220;
+        const boxHeight = 70;
+        const boxX = centerX - (boxWidth / 2);
+        const boxY = topY - boxHeight - 20; // 往上浮動 20px
 
-        // 計算位置 (將卡片放在 QR Code 的上方)
-        // 注意：這裡的坐標是相對於 video 元素的原始像素，需換算成螢幕百分比或直接使用
-        const displayX = (x / region.canvasWidth) * window.innerWidth;
-        const displayY = (y / region.canvasHeight) * window.innerHeight;
+        // 陰影
+        ctx.shadowColor = "rgba(0,0,0,0.5)";
+        ctx.shadowBlur = 10;
+        
+        // 卡片背景
+        drawRoundedRect(boxX, boxY, boxWidth, boxHeight, 10, "rgba(255, 255, 255, 0.95)");
+        
+        // 邊條 (左側顏色條指示狀態)
+        drawRoundedRect(boxX, boxY, 10, boxHeight, 0, color); // 修正圓角會比較複雜，這裡簡化畫一個條
+        
+        // 清除陰影設定，避免文字糊掉
+        ctx.shadowColor = "transparent";
+        ctx.shadowBlur = 0;
 
-        infoCard.style.display = 'block';
-        infoCard.style.left = `0px`;
-        infoCard.style.top = `0px`;
-        infoCard.style.transform = `translate(${displayX}px, ${displayY - 100}px)`;
+        // 文字設定
+        ctx.font = "bold 24px 'Microsoft JhengHei'";
+        ctx.fillStyle = "#333";
+        ctx.fillText(titleText, boxX + 25, boxY + 30);
 
-        // 偵測停頓消失
-        clearTimeout(window.arTimer);
-        window.arTimer = setTimeout(() => {
-            infoCard.style.display = 'none';
-        }, 1500);
+        ctx.font = "16px 'Microsoft JhengHei'";
+        ctx.fillStyle = "#666";
+        ctx.fillText(subText, boxX + 25, boxY + 55);
+
+        // 更新底部 HUD 讓使用者知道掃到了
+        hud.innerText = `${statusIcon} 偵測到：${carId}`;
+        hud.style.color = color === "#34C759" ? "#006400" : "#8B0000";
+
+      } else {
+        // 沒掃到時，重置底部 HUD
+        hud.innerText = "📷 搜尋台車 QR Code...";
+        hud.style.color = "#333";
+      }
     }
-  };
+    requestAnimationFrame(tick);
+  }
 
-  async function init() {
+  // ==========================================
+  // 📥 資料預載
+  // ==========================================
+  async function preload() {
+    const until = todayYMD();
+    const from = minus18Months(until); 
+    
+    // 輔助函式：篩選日期區間
+    const filterRange = (arr) => {
+        const f = new Date(from).getTime();
+        const u = new Date(until).setHours(23,59,59);
+        return (arr||[]).filter(r=>{
+            const t = toDate(r.time);
+            return t && t.getTime() >= f && t.getTime() <= u;
+        });
+    }
+
     try {
-      // 1. 先抓資料
-      const res = await fetch(`${CONFIG.GAS_URL}?mode=list`);
+      loadingText.innerText = "正在同步雲端資料...";
+      const res = await fetch(`${CONFIG.GAS_URL}?mode=list&from=${from}&until=${until}`);
       const data = await res.json();
-      allRecords = data.records || [];
-      document.getElementById('loadingOverlay').style.display = 'none';
+      allRecords = filterRange(data.records);
+      
+      // 資料載入完成，關閉遮罩，啟動 AR
+      overlay.style.display = "none";
+      startCamera();
 
-      // 2. 啟動相機 (調整參數以利 AR 追蹤)
-      const config = { 
-        fps: 20,          // 提高幀率讓追蹤更順
-        qrbox: (w, h) => { return { width: w*0.8, height: h*0.8 } },
-        aspectRatio: 1.0  // 強制比例一致
-      };
-
-      await html5QrCode.start(
-        { facingMode: "environment" }, 
-        config,
-        onScanSuccess
-      );
-    } catch (e) {
-      console.error(e);
-      document.getElementById('loadingOverlay').innerText = "錯誤: " + e;
+    } catch(e) {
+      loadingText.innerText = "讀取失敗，嘗試載入全部...";
+      try {
+          const res2 = await fetch(`${CONFIG.GAS_URL}?mode=list`);
+          const data2 = await res2.json();
+          allRecords = filterRange(data2.records);
+          overlay.style.display = "none";
+          startCamera();
+      } catch(e2) { 
+        loadingText.innerHTML = "<span style='color:red'>❌ 資料載入失敗，請重新整理</span>"; 
+      }
     }
   }
 
-  init();
+  // 啟動
+  preload();
+
 </script>
 </body>
 </html>
