@@ -3,106 +3,76 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
-  <title>UT台車 真AR點檢系統</title>
+  <title>UT台車 極速AR</title>
   <script src="https://unpkg.com/html5-qrcode"></script>
   <style>
     body {
       margin: 0; padding: 0;
       background-color: #000;
-      font-family: "Segoe UI", "Microsoft JhengHei", sans-serif;
-      overflow: hidden; /* 防止卷軸出現 */
-      height: 100vh;
-      width: 100vw;
+      font-family: sans-serif; /* 用最預設的字體 */
+      overflow: hidden;
+      height: 100vh; width: 100vw;
     }
 
-    /* === 1. 全螢幕相機容器 === */
     #ar-scene {
       position: relative;
-      width: 100%;
-      height: 100%;
+      width: 100%; height: 100%;
       background: #000;
     }
 
-    /* 強制 video 填滿，這是座標對齊的關鍵 */
     #reader {
       width: 100% !important;
       height: 100% !important;
       object-fit: cover;
     }
     #reader video {
-      width: 100%;
-      height: 100%;
-      object-fit: cover; /* 讓畫面填滿不留黑邊 */
+      width: 100%; height: 100%;
+      object-fit: cover;
     }
 
-    /* === 2. 懸浮 AR 標籤 (這就是那張卡片) === */
+    /* === 優化後的 AR 標籤 === */
+    /* 移除所有陰影、圓角、毛玻璃，只保留純粹的色塊以求最高效能 */
     #ar-tag {
       position: absolute;
       top: 0; left: 0;
-      width: 240px;
-      /* 初始隱藏 */
-      opacity: 0; 
-      transform: scale(0.8);
-      transform-origin: top left; /* 以左上角為定位點 */
-      transition: opacity 0.2s, transform 0.1s linear; /* 座標移動要順暢 */
-      pointer-events: auto; /* 允許點擊 */
+      width: 220px;
+      opacity: 0;
+      transform-origin: top left;
+      /* 減少動畫時間，讓反應更靈敏 */
+      transition: top 0.1s linear, left 0.1s linear; 
+      pointer-events: auto;
       z-index: 10;
     }
 
-    /* 卡片樣式 (科技感) */
     .tag-content {
-      background: rgba(16, 24, 39, 0.85); /* 深藍黑半透明 */
-      backdrop-filter: blur(8px);
-      border: 1px solid rgba(59, 130, 246, 0.5); /* 亮藍邊框 */
-      box-shadow: 0 0 15px rgba(59, 130, 246, 0.3);
-      border-radius: 8px;
-      padding: 12px;
+      /* [效能關鍵] 移除 backdrop-filter: blur，改用高對比純色背景 */
+      background: rgba(0, 0, 0, 0.85); 
+      border: 2px solid #00ff00; /* 高對比綠色邊框 */
+      padding: 8px;
       color: #fff;
-      position: relative;
     }
-    
-    /* 連接線 (指向 QR Code 的裝飾線) */
+
+    /* 簡單的連線，不使用複雜 CSS */
     .tag-line {
-      position: absolute;
-      top: -20px; left: 20px;
-      width: 2px; height: 20px;
-      background: #3b82f6;
-    }
-    .tag-dot {
-      position: absolute;
-      top: -24px; left: 17px;
-      width: 8px; height: 8px;
-      background: #3b82f6;
-      border-radius: 50%;
-      box-shadow: 0 0 5px #3b82f6;
+      position: absolute; top: -15px; left: 0;
+      width: 2px; height: 15px; background: #00ff00;
     }
 
-    /* 內容排版 */
-    .tag-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 4px; }
-    .tag-id { font-size: 16px; font-weight: bold; color: #60a5fa; }
-    .tag-status { font-size: 12px; padding: 2px 6px; border-radius: 4px; font-weight: bold; }
-    .status-ok { background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid #059669; }
-    .status-ng { background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid #dc2626; }
-    
-    .tag-body { font-size: 13px; color: #cbd5e1; line-height: 1.4; }
-    .tag-row { display: flex; justify-content: space-between; }
-    
-    /* 載入中動畫 */
-    .loading-pulse {
-      animation: pulse 1.5s infinite;
-      text-align: center; font-size: 12px; color: #94a3b8;
+    .tag-header { 
+      display: flex; justify-content: space-between; 
+      border-bottom: 1px solid #555; padding-bottom: 4px; margin-bottom: 4px;
     }
-    @keyframes pulse { 0% {opacity:0.6;} 50% {opacity:1;} 100% {opacity:0.6;} }
+    .tag-id { font-size: 16px; font-weight: bold; color: #00ff00; }
+    
+    .tag-row { font-size: 12px; display: flex; justify-content: space-between; line-height: 1.5; }
+    .status-ok { color: #00ff00; font-weight: bold; }
+    .status-ng { color: #ff0000; font-weight: bold; }
 
-    /* 隱藏的 select */
     #cameraSelect { display: none; }
     
-    /* 輔助訊息 */
-    #guide-msg {
-      position: absolute; bottom: 50px; left: 0; width: 100%;
-      text-align: center; color: rgba(255,255,255,0.7);
-      font-size: 14px; text-shadow: 0 1px 2px #000;
-      pointer-events: none;
+    #debug-fps {
+      position: absolute; top: 5px; left: 5px; 
+      color: #0f0; font-size: 10px; background: rgba(0,0,0,0.5); z-index:99;
     }
   </style>
 </head>
@@ -110,23 +80,21 @@
 
 <div id="ar-scene">
   <div id="reader"></div>
+  <div id="debug-fps">低畫質模式: 320p</div>
   
   <div id="ar-tag">
-    <div class="tag-dot"></div>
     <div class="tag-line"></div>
     <div class="tag-content" id="tagContent">
-      <div class="loading-pulse">🔍 讀取資料中...</div>
+      <div>讀取中...</div>
     </div>
   </div>
-
-  <div id="guide-msg">請將鏡頭對準台車 QR Code</div>
 </div>
 
 <select id="cameraSelect"></select>
 
 <script>
   // ==========================================
-  // ⚙️ 設定檔與邏輯
+  // ⚙️ 設定檔
   // ==========================================
   const CONFIG = {
     CHECK_MONTHS: [1, 7], 
@@ -136,14 +104,10 @@
   let allRecords = [];
   let qrScanner = null;
   let currentCameraId = null;
-  
-  // AR 狀態變數
-  let lastScannedId = null;   // 紀錄上次掃到的 ID，避免重複 fetch
-  let lastScanTime = 0;       // 用來判斷是否「跟丟了」
-  let hideTimer = null;       // 隱藏卡片的計時器
-  const HIDE_DELAY_MS = 1000; // 如果 1秒內沒掃到，就隱藏卡片
+  let hideTimer = null;
+  const HIDE_DELAY_MS = 1000;
 
-  // 日期處理工具 (沿用您的邏輯)
+  // 簡單日期處理
   function toDate(val){
     if (!val) return null;
     if (Object.prototype.toString.call(val) === '[object Date]' && !isNaN(val)) return val;
@@ -154,7 +118,7 @@
 
   function checkPeriodicStatus(recordDateVal) {
     const recordDate = toDate(recordDateVal);
-    if (!recordDate) return { isOk: false, msg: "無", targetStr:"-", recordStr:"-" };
+    if (!recordDate) return { isOk: false, targetStr:"-", recordStr:"-" };
     const now = new Date();
     const sortedMonths = CONFIG.CHECK_MONTHS.sort((a,b) => a-b);
     let targetMonth = sortedMonths[0];
@@ -169,69 +133,47 @@
   }
 
   // ==========================================
-  // 🚀 核心：更新 AR 標籤位置
+  // 🚀 AR 位置更新 (極簡版)
   // ==========================================
   function updateARPosition(decodedResult) {
-    // 1. 取得 QR Code 的四個角落座標 (這是 video 內的原始座標)
-    // format: { x: number, y: number }
     const loc = decodedResult.result.location; 
-    
     if (!loc) return;
 
-    // 我們簡單取「右上角 (topRightCorner)」作為標籤的錨點
-    // 你也可以算中心點：(loc.topLeftCorner.x + loc.bottomRightCorner.x) / 2 ...
+    // 使用右上角
     const point = loc.topRightCorner; 
 
-    // 2. 座標轉換： Video座標 -> 螢幕座標
-    // Html5Qrcode 的 video 元素
     const videoEl = document.querySelector("#reader video");
     if (!videoEl) return;
 
-    // 原始影片尺寸 (例如 640x480)
     const videoWidth = videoEl.videoWidth;
     const videoHeight = videoEl.videoHeight;
-    
-    // 實際顯示在螢幕上的尺寸 (例如 390x844)
     const displayWidth = videoEl.offsetWidth;
     const displayHeight = videoEl.offsetHeight;
 
-    // 這裡是 object-fit: cover 的數學難點
-    // 我們需要算出「縮放比例」和「裁切偏移」
-    const scaleX = displayWidth / videoWidth;
-    const scaleY = displayHeight / videoHeight;
-    const scale = Math.max(scaleX, scaleY); // 因為是 cover，取最大值
-
-    // 算出影片置中後的偏移量
+    // 縮放計算
+    const scale = Math.max(displayWidth / videoWidth, displayHeight / videoHeight);
     const overflowX = (videoWidth * scale - displayWidth) / 2;
     const overflowY = (videoHeight * scale - displayHeight) / 2;
 
-    // 最終螢幕座標公式
     const screenX = (point.x * scale) - overflowX;
     const screenY = (point.y * scale) - overflowY;
 
-    // 3. 移動 DOM 元素
     const tag = document.getElementById("ar-tag");
     
-    // 加上一點偏移量，讓卡片不要擋住 QR Code 本身，而是浮在右上方
-    tag.style.left = `${screenX + 10}px`; 
-    tag.style.top = `${screenY - 30}px`;
+    // 直接設定位置，不進行複雜運算
+    tag.style.left = `${screenX}px`; 
+    tag.style.top = `${screenY - 20}px`; // 稍微往上提一點
     
-    // 顯示卡片
     tag.style.opacity = 1;
-    tag.style.transform = "scale(1)";
 
-    // 重置隱藏計時器 (只要持續掃到，就不會消失)
     clearTimeout(hideTimer);
     hideTimer = setTimeout(() => {
-      // 如果超過 1 秒沒掃到，就淡出卡片
       tag.style.opacity = 0;
-      tag.style.transform = "scale(0.8)";
-      lastScannedId = null; // 允許下次重新讀取
     }, HIDE_DELAY_MS);
   }
 
   // ==========================================
-  // 📋 渲染資料到卡片上
+  // 📋 內容更新
   // ==========================================
   function updateTagContent(carId) {
     const contentEl = document.getElementById("tagContent");
@@ -240,52 +182,40 @@
 
     if (!result) {
       contentEl.innerHTML = `
-        <div class="tag-header">
-           <span class="tag-id">${carId}</span>
-           <span class="tag-status status-ng">無資料</span>
-        </div>
-        <div class="tag-body">系統中無此紀錄</div>
+        <div class="tag-header"><span class="tag-id">${carId}</span><span class="status-ng">無資料</span></div>
+        <div class="tag-row">查無此台車紀錄</div>
       `;
     } else {
       const status = checkPeriodicStatus(result.time);
-      const statusClass = status.isOk ? "status-ok" : "status-ng";
-      const statusText = status.isOk ? "合格" : "未檢";
+      const statusText = status.isOk ? `<span class="status-ok">合格</span>` : `<span class="status-ng">未檢</span>`;
       
       contentEl.innerHTML = `
-        <div class="tag-header">
-           <span class="tag-id">${carId}</span>
-           <span class="tag-status ${statusClass}">${statusText}</span>
-        </div>
-        <div class="tag-body">
-           <div class="tag-row"><span>上次:</span> <span>${status.recordStr}</span></div>
-           <div class="tag-row"><span>應檢:</span> <span>${status.targetStr}</span></div>
-           <div style="margin-top:4px; font-size:11px; color:#94a3b8; border-top:1px dashed #444; padding-top:2px;">
-             ${result.workerId ? '點檢人: '+result.workerId : ''}
-           </div>
-        </div>
+        <div class="tag-header"><span class="tag-id">${carId}</span>${statusText}</div>
+        <div class="tag-row"><span>應檢:${status.targetStr}</span></div>
+        <div class="tag-row"><span>實檢:${status.recordStr}</span></div>
+        <div class="tag-row"><span>人員:${result.workerId || '-'}</span></div>
       `;
     }
   }
 
   // ==========================================
-  // 📷 攝影機初始化
+  // 📷 攝影機啟動 (低畫質模式)
   // ==========================================
   async function initCamera() {
     qrScanner = new Html5Qrcode("reader");
     const devices = await Html5Qrcode.getCameras();
     
     if (devices && devices.length) {
-      // 找最後一個鏡頭 (通常是後置)
       currentCameraId = devices[devices.length-1].id;
       
-      // 使用您的低延遲參數
       const config = {
-        fps: 15, // 提高一點 FPS 讓追蹤比較平滑 (5太卡，15還可以接受)
-        qrbox: { width: 250, height: 250 },
-        aspectRatio: window.innerHeight / window.innerWidth, // 配合全螢幕
+        fps: 10, // 降低 FPS，減少 CPU 負擔
+        qrbox: { width: 180, height: 180 }, // 縮小掃描框
+        aspectRatio: window.innerHeight / window.innerWidth,
         videoConstraints: {
-          width:  { ideal: 640 }, // 保持低解析度以求效能
-          height: { ideal: 480 },
+          // [效能關鍵] 強制使用極低解析度 320x240 (QVGA)
+          width:  { ideal: 320 }, 
+          height: { ideal: 240 },
           facingMode: "environment"
         }
       };
@@ -294,23 +224,14 @@
         currentCameraId,
         config,
         (decodedText, decodedResult) => {
-          // === 掃描成功 Callback (會持續觸發) ===
-          
-          // 1. 更新 AR 位置 (每幀都做)
           updateARPosition(decodedResult);
-
-          // 2. 如果是新的 ID，才更新資料內容 (減少 DOM 操作)
-          if (decodedText !== lastScannedId) {
-            lastScannedId = decodedText;
-            updateTagContent(decodedText);
-            
-            // 震動一下表示抓到了
-            if (navigator.vibrate) navigator.vibrate(50);
+          if (document.getElementById("tagContent").dataset.lastId !== decodedText) {
+             document.getElementById("tagContent").dataset.lastId = decodedText;
+             updateTagContent(decodedText);
+             if (navigator.vibrate) navigator.vibrate(50);
           }
         },
-        (error) => {
-          // 掃不到時什麼都不做，讓 hideTimer 自己去跑
-        }
+        (error) => {}
       );
     } else {
       alert("無攝影機");
@@ -326,15 +247,13 @@
     const from = past.toISOString().split('T')[0];
 
     try {
-      // 預先載入資料
       const res = await fetch(`${CONFIG.GAS_URL}?mode=list&from=${from}&until=${today}`);
       const data = await res.json();
       allRecords = data.records || [];
-      
-      document.getElementById("tagContent").innerHTML = '<div style="color:#fff">請掃描...</div>';
+      document.getElementById("tagContent").innerHTML = '<div>請掃描...</div>';
       await initCamera();
     } catch(e) {
-      alert("資料載入失敗");
+      document.getElementById("debug-fps").innerText = "資料連線失敗";
     }
   }
 
