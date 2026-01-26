@@ -3,72 +3,48 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
-  <title>UT台車 AR 點檢系統</title>
+  <title>UT台車 AR 點檢系統 v2</title>
   <script src="https://unpkg.com/html5-qrcode"></script>
   <style>
-    body { margin: 0; overflow: hidden; font-family: sans-serif; background: #000; }
-    
-    /* 讓攝影機畫面滿版 */
-    #reader { width: 100vw; height: 100vh; }
-    #reader video { object-fit: cover !important; }
+    body { margin: 0; overflow: hidden; font-family: sans-serif; background: #000; position: relative; width: 100vw; height: 100vh; }
+    #reader { width: 100%; height: 100%; }
+    /* 讓影片填滿全螢幕 */
+    #reader video { object-fit: cover !important; width: 100% !important; height: 100% !important; }
 
-    /* AR 浮動卡片樣式 */
-    #ar-overlay {
-      position: absolute;
-      top: 0; left: 0;
-      pointer-events: none; /* 讓點擊穿透，不影響掃描 */
-      width: 100%; height: 100%;
-    }
-
+    /* AR 資訊卡 */
     .ar-card {
       position: absolute;
-      background: rgba(255, 255, 255, 0.95);
-      border-left: 6px solid #007bff;
-      padding: 12px;
+      background: rgba(255, 255, 255, 0.92);
+      border-left: 5px solid #007bff;
+      padding: 10px;
       border-radius: 8px;
-      box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-      width: 200px;
-      transition: all 0.1s ease-out; /* 讓移動平滑一點 */
-      z-index: 1000;
-      display: none; /* 預設隱藏 */
+      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+      width: 180px;
+      z-index: 9999;
+      pointer-events: none; /* 避免擋住觸控 */
+      display: none; 
+      transition: transform 0.1s linear; /* 平滑跟隨 */
     }
 
-    .ar-card::after { /* 對話框箭頭 */
-      content: ""; position: absolute; left: -10px; top: 20px;
-      border-top: 10px solid transparent; border-bottom: 10px solid transparent;
-      border-right: 10px solid rgba(255, 255, 255, 0.95);
-    }
+    .status-ok { color: #16a34a; font-weight: bold; }
+    .status-ng { color: #dc2626; font-weight: bold; }
+    .ar-info { font-size: 11px; color: #555; margin-top: 4px; }
 
-    .ar-status { font-weight: bold; font-size: 16px; margin-bottom: 4px; }
-    .status-ok { color: #16a34a; }
-    .status-ng { color: #dc2626; }
-    .ar-info { font-size: 12px; color: #666; }
-
-    /* UI 控制層 */
-    #ui-layer {
-      position: fixed; top: 20px; width: 100%; text-align: center;
-      z-index: 1001; pointer-events: none;
-    }
-    .hint { background: rgba(0,0,0,0.5); color: white; padding: 5px 15px; border-radius: 20px; }
-    #loadingOverlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); color: white; display: flex; align-items: center; justify-content: center; z-index: 2000; }
+    #loadingOverlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); color: white; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 10000; }
   </style>
 </head>
 <body>
 
-<div id="loadingOverlay">📡 載入資料庫中...</div>
-
-<div id="ui-layer">
-    <span class="hint">請將鏡頭對準台車 QR Code</span>
+<div id="loadingOverlay">
+  <div>📡 資料庫同步中...</div>
 </div>
 
 <div id="reader"></div>
 
-<div id="ar-overlay">
-    <div id="infoCard" class="ar-card">
-        <div id="ar-carId" style="font-size: 14px; color: #888;">#載入中</div>
-        <div id="ar-status" class="ar-status">狀態判斷中...</div>
-        <div id="ar-date" class="ar-info">最後點檢：-</div>
-    </div>
+<div id="infoCard" class="ar-card">
+    <div id="ar-carId" style="font-size: 12px; color: #666;"></div>
+    <div id="ar-status"></div>
+    <div id="ar-date" class="ar-info"></div>
 </div>
 
 <script>
@@ -79,67 +55,85 @@
 
   let allRecords = [];
   const infoCard = document.getElementById('infoCard');
-  
-  // 初始化掃描器 (不使用停止模式，改用連續偵測)
   const html5QrCode = new Html5Qrcode("reader");
 
-  // 判斷狀態 (與您原本邏輯一致)
-  function checkStatus(carId) {
-    const record = allRecords.filter(r => r.carId === carId).sort((a,b)=>new Date(b.time)-new Date(a.time))[0];
-    if (!record) return { isOk: false, date: "無紀錄", msg: "查無資料" };
+  // 狀態判斷邏輯
+  function getCarStatus(carId) {
+    const matches = allRecords.filter(r => r.carId === carId).sort((a,b)=>new Date(b.time)-new Date(a.time));
+    if (matches.length === 0) return { isOk: false, date: "無資料", msg: "❌ 尚未點檢" };
 
-    const date = new Date(record.time);
+    const lastDate = new Date(matches[0].time);
     const now = new Date();
-    const sortedMonths = CONFIG.CHECK_MONTHS.sort((a,b) => a-b);
-    let targetMonth = sortedMonths.reverse().find(m => (now.getMonth() + 1) >= m) || sortedMonths[0];
+    const curMonth = now.getMonth() + 1;
     
-    const isOk = (date.getFullYear() === now.getFullYear() && (date.getMonth() + 1) === targetMonth);
-    return { isOk, date: record.time, msg: isOk ? "✅ 本期合格" : "❌ 未點檢" };
+    const sortedMonths = CONFIG.CHECK_MONTHS.sort((a,b) => a-b);
+    let targetMonth = sortedMonths[0];
+    for (let i = sortedMonths.length - 1; i >= 0; i--) {
+        if (curMonth >= sortedMonths[i]) { targetMonth = sortedMonths[i]; break; }
+    }
+
+    const isOk = (lastDate.getFullYear() === now.getFullYear() && (lastDate.getMonth() + 1) === targetMonth);
+    return { isOk, date: matches[0].time, msg: isOk ? "✅ 本期合格" : "⚠️ 非本期紀錄" };
   }
 
-  const qrCodeSuccessCallback = (decodedText, decodedResult) => {
-    // 1. 取得 QR Code 在畫面上的位置
-    // html5-qrcode 提供四角座標，我們取其範圍中心
-    const box = decodedResult.alignmentPoints;
-    if (box && box.length > 0) {
-        const x = box[0].x;
-        const y = box[0].y;
-
-        // 2. 更新 AR 卡片內容
-        const statusData = checkStatus(decodedText);
-        document.getElementById('ar-carId').innerText = "🚚 " + decodedText;
-        document.getElementById('ar-status').innerText = statusData.msg;
-        document.getElementById('ar-status').className = `ar-status ${statusData.isOk ? 'status-ok' : 'status-ng'}`;
-        document.getElementById('ar-date').innerText = "最後點檢：" + statusData.date;
-
-        // 3. 移動卡片位置 (稍微往右偏避開 QR Code 本身)
-        infoCard.style.display = 'block';
-        infoCard.style.transform = `translate(${x + 20}px, ${y - 50}px)`;
+  const onScanSuccess = (decodedText, decodedResult) => {
+    // 關鍵修正：從 decodedResult.region 獲取 QR Code 的座標範圍
+    const region = decodedResult.region;
+    if (region && region.bbox) {
+        const { x, y, width, height } = region.bbox;
         
-        // 4. 自動隱藏機制 (3秒沒掃到就消失)
-        clearTimeout(window.hideTimer);
-        window.hideTimer = setTimeout(() => { infoCard.style.display = 'none'; }, 2000);
+        // 更新內容
+        const status = getCarStatus(decodedText);
+        document.getElementById('ar-carId').innerText = "編號: " + decodedText;
+        document.getElementById('ar-status').innerText = status.msg;
+        document.getElementById('ar-status').className = status.isOk ? 'status-ok' : 'status-ng';
+        document.getElementById('ar-date').innerText = "日期: " + status.date;
+
+        // 計算位置 (將卡片放在 QR Code 的上方)
+        // 注意：這裡的坐標是相對於 video 元素的原始像素，需換算成螢幕百分比或直接使用
+        const displayX = (x / region.canvasWidth) * window.innerWidth;
+        const displayY = (y / region.canvasHeight) * window.innerHeight;
+
+        infoCard.style.display = 'block';
+        infoCard.style.left = `0px`;
+        infoCard.style.top = `0px`;
+        infoCard.style.transform = `translate(${displayX}px, ${displayY - 100}px)`;
+
+        // 偵測停頓消失
+        clearTimeout(window.arTimer);
+        window.arTimer = setTimeout(() => {
+            infoCard.style.display = 'none';
+        }, 1500);
     }
   };
 
-  async function startAR() {
+  async function init() {
     try {
+      // 1. 先抓資料
       const res = await fetch(`${CONFIG.GAS_URL}?mode=list`);
       const data = await res.json();
-      allRecords = data.records;
+      allRecords = data.records || [];
       document.getElementById('loadingOverlay').style.display = 'none';
+
+      // 2. 啟動相機 (調整參數以利 AR 追蹤)
+      const config = { 
+        fps: 20,          // 提高幀率讓追蹤更順
+        qrbox: (w, h) => { return { width: w*0.8, height: h*0.8 } },
+        aspectRatio: 1.0  // 強制比例一致
+      };
 
       await html5QrCode.start(
         { facingMode: "environment" }, 
-        { fps: 10, qrbox: (w, h) => { return { width: w * 0.8, height: h * 0.8 } } },
-        qrCodeSuccessCallback
+        config,
+        onScanSuccess
       );
-    } catch (err) {
-      alert("啟動失敗: " + err);
+    } catch (e) {
+      console.error(e);
+      document.getElementById('loadingOverlay').innerText = "錯誤: " + e;
     }
   }
 
-  startAR();
+  init();
 </script>
 </body>
 </html>
