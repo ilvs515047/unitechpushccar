@@ -25,26 +25,28 @@
 
     /* ===== 上方工具列（日期選擇器） ===== */
     .topbar-wrap { position: sticky; top: 0; z-index: 5; background: #f5faff; padding-bottom: 8px; }
-    .topbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: -8px 0 8px; padding: 8px 0; }
-    .logout-btn { padding: 6px 10px; border-radius: 10px; border: 1px solid #ddd; background: #fff; cursor: pointer; }
+    .topbar { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; margin: -8px 0 8px; padding: 8px 0; flex-wrap: wrap;}
+    .logout-btn { padding: 6px 10px; border-radius: 10px; border: 1px solid #ddd; background: #fff; cursor: pointer; white-space: nowrap;}
 
+    /* 修改：日期選擇器容器樣式，支援兩個輸入框 */
     .date-picker{
-      display:flex; align-items:center; gap:8px;
+      display:flex; align-items:center; gap:6px;
       background:#fff; border:1px solid #ddd; padding:6px 10px; border-radius:10px;
       box-shadow: 0 3px 10px rgba(0,0,0,.06);
+      flex-wrap: wrap;
     }
-    .date-picker label{ font-size:14px; color:#333; white-space:nowrap; }
+    .date-picker label{ font-size:14px; color:#333; white-space:nowrap; font-weight: bold;}
     .date-input{
-      padding:6px 10px; border:1px solid #ccc; border-radius:8px; font-size:14px; background:#fff;
+      padding:6px 8px; border:1px solid #ccc; border-radius:8px; font-size:14px; background:#fff; max-width: 130px;
     }
+    .date-sep { color: #888; font-weight: bold; }
 
-    /* ===== 新增：左側直排容器（日期選擇器 + 連結按鈕） ===== */
+    /* ===== 左側直排容器 ===== */
     .topbar-left{
       display:flex;
       flex-direction:column;
       gap:8px;
     }
-    /* 新增：連結按鈕同風格強化 */
     #linkBtn{
       background:#2563eb;
       color:#fff;
@@ -133,11 +135,13 @@
     <div class="topbar">
       <div class="topbar-left">
         <div class="date-picker">
-          <label for="datePicker">📆 截止日期（往前 1 年）</label>
-          <input id="datePicker" class="date-input" type="date" />
-          <button id="dateLoadBtn" class="logout-btn" style="border-color:#ccc">載入</button>
+          <label>📆 日期區間：</label>
+          <input id="dateStart" class="date-input" type="date" title="起始日期" />
+          <span class="date-sep">~</span>
+          <input id="dateEnd" class="date-input" type="date" title="結束日期" />
+          <button id="dateLoadBtn" class="logout-btn" style="border-color:#ccc; background:#f0f9ff; color:#0284c7; font-weight:bold;">🔍 查詢</button>
         </div>
-        <button id="linkBtn" class="logout-btn">🔗 檢視全部點檢資料</button>
+        <button id="linkBtn" class="logout-btn">🔗 檢視 Google Sheet 原始檔</button>
       </div>
 
       <button id="logoutBtn" class="logout-btn">🚪 登出</button>
@@ -145,7 +149,7 @@
   </div>
 
   <h2>📋 燿華電子台車點檢紀錄總覽</h2>
-  <input type="text" id="search" placeholder="🔍 搜尋台車編號、工號、內容…">
+  <input type="text" id="search" placeholder="🔍 搜尋台車編號、工號、內容（針對目前查詢結果篩選）…">
   <div class="container">
     <table id="recordTable">
       <thead><tr id="tableHead"></tr></thead>
@@ -182,7 +186,6 @@ function logout(){
   document.getElementById('authInput').focus();
 }
 
-// 雜湊計算工具函式 (使用瀏覽器內建 Crypto API)
 async function sha256(message) {
   const msgBuffer = new TextEncoder().encode(message);
   const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
@@ -202,7 +205,9 @@ const loaderMsg=document.getElementById("loaderMsg");
 const $fabWrap=document.getElementById("fabWrap");
 const $batchBtn=document.getElementById("batchBtn");
 const $batchCount=document.getElementById("batchCount");
-const $datePicker=document.getElementById("datePicker");
+// 修改：抓取兩個日期欄位
+const $dateStart=document.getElementById("dateStart");
+const $dateEnd=document.getElementById("dateEnd");
 const $dateLoadBtn=document.getElementById("dateLoadBtn");
 const $linkBtn=document.getElementById("linkBtn");
 
@@ -283,55 +288,68 @@ function writeNoteBackToRow(inputEl, noteText){
 }
 $batchBtn.addEventListener('click', batchUpdateNotes);
 
-// ====== 日期選擇器：初始化與事件 ======
+// ========================
+// 修改：日期選擇器邏輯（起始~結束）
+// ========================
 function todayISO(){ const d=new Date(); const m=String(d.getMonth()+1).padStart(2,'0'); const day=String(d.getDate()).padStart(2,'0'); return `${d.getFullYear()}-${m}-${day}`; }
-function initDatePicker(){ $datePicker.value = todayISO(); }
-const $datePickerEl = $datePicker;
+
+// 取得今天往前推 N 天的日期
+function daysAgoISO(n){
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  const m=String(d.getMonth()+1).padStart(2,'0'); 
+  const day=String(d.getDate()).padStart(2,'0'); 
+  return `${d.getFullYear()}-${m}-${day}`;
+}
+
+function initDatePicker(){ 
+  $dateEnd.value = todayISO(); 
+  $dateStart.value = daysAgoISO(30); // 預設顯示過去 30 天，想看更多可手動調
+}
 
 $dateLoadBtn?.addEventListener('click', ()=>{
-  if(!$datePicker.value){ alert('請選擇日期'); return; }
-  const d = $datePicker.value;
-  showLoader(`⚡ 正載入 ${d} 往前 1 年的資料…`);
+  const s = $dateStart.value;
+  const e = $dateEnd.value;
+  
+  if(!s || !e){ alert('請選擇起始與結束日期'); return; }
+  if(s > e){ alert('起始日期不能晚於結束日期'); return; }
+
+  showLoader(`⚡ 正載入 ${s} 至 ${e} 的資料…`);
   initAppAfterAuth();
 });
-$datePicker?.addEventListener('keydown',(e)=>{ if(e.key==='Enter') $dateLoadBtn.click(); });
 
 // ====== 連結按鈕事件 ======
 $linkBtn?.addEventListener('click', ()=>{
-  if(!LINK_URL){
-    alert('尚未設定連結網址，請在程式碼中的 LINK_URL 填入你的網址。');
-    return;
-  }
-  const until = ($datePicker && $datePicker.value) ? $datePicker.value : todayISO();
-  const from  = minusOneYearSameDay(until);
+  if(!LINK_URL){ alert('尚未設定連結網址'); return; }
+  // 使用當前選擇的區間作為參數
+  const from  = $dateStart.value || daysAgoISO(30);
+  const until = $dateEnd.value || todayISO();
   const url   = `${LINK_URL}?from=${encodeURIComponent(from)}&until=${encodeURIComponent(until)}`;
   window.open(url, '_blank', 'noopener');
 });
 
-// ====== 授權流程（核心修改處） ======
+// ====== 授權流程 ======
 async function unlockIfAuthed(){
   if(isAuthed()){
     $overlay.style.display="none";
     initDatePicker();
-    showLoader(`⚡ 正載入 ${$datePicker.value} 往前 1 年的資料…`);
+    // 預設載入區間
+    showLoader(`⚡ 正載入 ${$dateStart.value} 至 ${$dateEnd.value} 的資料…`);
     initAppAfterAuth();
   }
 }
 
-// 登入邏輯：計算輸入的 hash 並比對
 async function tryLogin(){
   const pw = ($input.value||"").trim();
   if(!pw){ $err.textContent="請先輸入密碼"; return; }
   
-  // 顯示一點載入感（雖然 hash 很快）
-  // 計算 hash
   try {
     const userHash = await sha256(pw);
     if(userHash === HASHED_PASSWORD){
       setAuthed(REMEMBER_HOURS);
       $overlay.style.display="none";
       initDatePicker();
-      showLoader(`⚡ 正載入 ${$datePicker.value} 往前 1 年的資料…`);
+      showLoader(`⚡ 正載入 ${$dateStart.value} 至 ${$dateEnd.value} 的資料…`);
       initAppAfterAuth();
       $err.textContent="";
     }else{
@@ -339,7 +357,7 @@ async function tryLogin(){
     }
   } catch (e) {
     console.error(e);
-    $err.textContent = "驗證過程發生錯誤 (瀏覽器環境不支援)";
+    $err.textContent = "驗證過程發生錯誤";
   }
 }
 
@@ -347,24 +365,28 @@ $btn.addEventListener('click', tryLogin);
 $input.addEventListener('keydown', e=>{ if(e.key==="Enter") tryLogin(); });
 $logout.addEventListener('click', logout);
 
-// 初次啟動
 unlockIfAuthed();
 if ($overlay.style.display !== 'none') $input.focus();
 
 // ========================
-// 1) 初始化資料（登入後執行）
+// 1) 初始化資料（修改：使用起始與結束日）
 // ========================
 async function initAppAfterAuth(){
-  const untilYMD = ($datePicker && $datePicker.value) ? $datePicker.value : todayISO();
-  const fromYMD  = minusOneYearSameDay(untilYMD);
+  const untilYMD = $dateEnd.value || todayISO();
+  const fromYMD  = $dateStart.value || daysAgoISO(30);
+  
   try{
     const tryUrl = `${GAS_URL}&from=${encodeURIComponent(fromYMD)}&until=${encodeURIComponent(untilYMD)}`;
     const res=await fetch(tryUrl);
     if(!res.ok) throw new Error("GAS 回傳非 200：" + res.status);
     const raw=await res.json();
+    
+    // 前端再次過濾確保精準
     const data = filterByRange(raw, fromYMD, untilYMD);
 
     buildTable(data);
+    // 重設搜尋框
+    document.getElementById("search").value = ""; 
     bindSearch();
 
     setTimeout(()=>{
@@ -384,15 +406,6 @@ async function initAppAfterAuth(){
 }
 
 // ====== 區間計算＆時間解析 ======
-function minusOneYearSameDay(ymd){
-  const [y,m,d] = ymd.split('-').map(n=>parseInt(n,10));
-  const dt = new Date(y, (m-1), d);
-  dt.setFullYear(dt.getFullYear()-1);
-  const yy = dt.getFullYear();
-  const mm = String(dt.getMonth()+1).padStart(2,'0');
-  const dd = String(dt.getDate()).padStart(2,'0');
-  return `${yy}-${mm}-${dd}`;
-}
 function startOfDay(ymd){
   const [y,m,d] = ymd.split('-').map(n=>parseInt(n,10));
   return new Date(y, m-1, d, 0,0,0,0);
@@ -412,6 +425,8 @@ function toDate(val){
   const d2 = new Date(s);
   return isNaN(d2) ? null : d2;
 }
+
+// 修改：Filter 支援任意區間
 function filterByRange(apiData, fromYMD, untilYMD){
   if (!apiData || !apiData.headers || !apiData.records) {
     throw new Error("GAS 回傳格式不正確！");
@@ -443,6 +458,30 @@ function buildTable(data){
 
   if (!data || !data.headers || !data.records) {
     throw new Error("GAS 回傳格式不正確！");
+  }
+
+  // 若查無資料，顯示提示
+  if(data.records.length === 0){
+    const tr = document.createElement("tr");
+    const td = document.createElement("td");
+    td.colSpan = data.headers.length + 1; 
+    td.textContent = "⚠️ 此日期區間內無點檢紀錄";
+    td.style.padding = "20px";
+    td.style.color = "#888";
+    tr.appendChild(td);
+    body.appendChild(tr);
+    
+    // 還是要印表頭
+    data.headers.forEach((h,i)=>{
+      if (hiddenColumnIndexes.includes(i)) return;
+      const th=document.createElement("th");
+      th.textContent=h;
+      head.appendChild(th);
+    });
+    const thNote=document.createElement("th");
+    thNote.textContent="新增備註";
+    head.appendChild(thNote);
+    return;
   }
 
   data.headers.forEach((h,i)=>{
@@ -525,12 +564,20 @@ function buildTable(data){
 }
 
 // ========================
-// 3) 搜尋
+// 3) 搜尋（針對已載入的資料進行文字過濾）
 // ========================
 function bindSearch(){
-  document.getElementById("search").addEventListener("input", e=>{
+  const searchInput = document.getElementById("search");
+  // 移除舊事件避免重複綁定 (雖然這結構不會重複執行 init，但保險起見)
+  const newHeader = searchInput.cloneNode(true);
+  searchInput.parentNode.replaceChild(newHeader, searchInput);
+  
+  newHeader.addEventListener("input", e=>{
     const keyword = e.target.value.trim().toLowerCase();
-    Array.from(document.getElementById("tableBody").rows).forEach(row=>{
+    const rows = document.getElementById("tableBody").rows;
+    if(rows.length === 1 && rows[0].cells[0].textContent.includes("無點檢紀錄")) return;
+
+    Array.from(rows).forEach(row=>{
       const match = Array.from(row.cells).some(cell =>
         cell.textContent.toLowerCase().includes(keyword)
       );
